@@ -1,0 +1,39 @@
+name: Actualizar bot ETF
+
+on:
+  schedule:
+    # Cada día a las 22:00 UTC (24:00 CET / 23:00 CEST) — mercados Xetra cerrados
+    - cron: "0 22 * * 1-5"
+  workflow_dispatch:  # permite ejecutarlo manualmente desde GitHub
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  generar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Generar index.html
+        run: python generar.py
+
+      - name: Commit y push si hay cambios
+        run: |
+          git config user.name "bot-etf"
+          git config user.email "bot-etf@users.noreply.github.com"
+          git add index.html estado.json
+          git diff --staged --quiet || git commit -m "Auto: actualizar datos $(date -u +%Y-%m-%d)"
+          git push

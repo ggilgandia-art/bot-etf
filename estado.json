@@ -1,0 +1,14 @@
+{
+  "posiciones": {
+    "RV_MUNDIAL": 0.0,
+    "RV_EMERGENTE": 0.0,
+    "BONOS_EUR": 0.0,
+    "ORO": 0.0
+  },
+  "caja": 1000.0,
+  "operaciones": [],
+  "meses_procesados": [],
+  "diario": [
+    "| 2026-10-26 | 2026-10-31 | 1000.0 | 1000.00 | — | Emergentes -0.2%, Bonos -2.3% | 2026-10-31 |"
+  ]
+}

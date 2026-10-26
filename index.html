@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#fcfcfb">
+<title>Bot ETF · seguimiento</title>
+<style>
+:root {
+  color-scheme: light;
+  --plane: #f4f4f1; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a;
+  --good: #006300; --bad: #b42323; --good-tint: #e2f0e2; --bad-tint: #f8e3e3; --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+    --good: #0ca30c; --bad: #e66767; --good-tint: #14301a; --bad-tint: #3b1c1c; --accent: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70;
+  --good: #0ca30c; --bad: #e66767; --good-tint: #14301a; --bad-tint: #3b1c1c; --accent: #3987e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--plane); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%; padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)); }
+main { max-width: 1040px; margin: 0 auto; padding: 0 16px 24px; }
+header { display: flex; gap: 12px; align-items: center; justify-content: space-between; max-width: 1040px; margin: 0 auto;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 4px; }
+h1 { font-size: 20px; margin: 4px 0 0; letter-spacing: -0.01em; }
+h2 { font-size: 18px; margin: 28px 0 10px; letter-spacing: -0.01em; }
+h3 { font-size: 16px; margin: 18px 0 6px; }
+p { margin: 8px 0; }
+.sub { color: var(--ink-2); font-size: 14px; }
+.peq { color: var(--muted); font-size: 13px; }
+.num { font-variant-numeric: tabular-nums; }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+.icono { background: none; border: 1px solid var(--ring); color: var(--ink-2); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+
+/* Navegación: abajo en el móvil, arriba en pantallas grandes */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: grid; grid-template-columns: repeat(6, 1fr);
+  background: var(--surface); border-top: 1px solid var(--ring); padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.tabs button { background: none; border: 0; border-top: 3px solid transparent; color: var(--ink-2); font: inherit; font-size: 12px;
+  font-weight: 600; min-height: 58px; padding: 6px 2px; cursor: pointer; line-height: 1.2; }
+nav.tabs button svg { display: block; margin: 0 auto 3px; width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round; }
+nav.tabs button[aria-selected="true"] { color: var(--accent); border-top-color: var(--accent); }
+@media (max-width: 380px) { nav.tabs button { font-size: 11px; } }
+@media (min-width: 760px) {
+  body { padding-bottom: 0; }
+  nav.tabs { position: sticky; top: 0; display: flex; gap: 4px; border-top: 0; border-bottom: 1px solid var(--ring); background: var(--plane);
+    max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  nav.tabs button { border-top: 0; border-bottom: 3px solid transparent; font-size: 15px; min-height: 48px; padding: 8px 14px; }
+  nav.tabs button svg { display: none; }
+  nav.tabs button[aria-selected="true"] { border-bottom-color: var(--accent); }
+}
+.panel[hidden] { display: none; }
+
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 16px; margin-top: 12px; }
+.tabla { overflow-x: auto; }
+.aviso { background: var(--surface); border: 1px solid var(--ring); border-left: 4px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin-top: 12px; font-size: 15px; }
+.aviso.alarma { border-left-color: var(--bad); color: var(--bad); font-weight: 600; }
+
+/* Portada de "Hoy" */
+.hero .k { color: var(--ink-2); font-size: 14px; }
+.hero .v { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin: 2px 0 4px; }
+.mini { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.mini > div { background: var(--plane); border-radius: 10px; padding: 10px 12px; }
+.mini .k { font-size: 13px; color: var(--ink-2); }
+.mini .v { font-size: 20px; font-weight: 650; }
+.gauge { position: relative; height: 12px; border-radius: 6px; background: var(--grid); margin: 26px 0 6px; }
+.gauge .zona { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bad-tint); border-radius: 6px 0 0 6px; border-right: 2px solid var(--bad); }
+.gauge .cero { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--axis); }
+.gauge .marca { position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--ink);
+  border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--ring); }
+.gauge .rotulo { position: absolute; bottom: 18px; transform: translateX(-50%); font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 650; padding: 2px 10px; border-radius: 999px; }
+.chip.in { color: var(--good); background: var(--good-tint); } .chip.out { color: var(--bad); background: var(--bad-tint); }
+.fila-decision { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Tarjetas de cada ETF */
+.etfs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+@media (min-width: 760px) { .etfs { grid-template-columns: repeat(4, 1fr); } }
+.etf { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 12px; }
+.etf .nom { font-weight: 650; font-size: 15px; line-height: 1.25; }
+.etf .cod { font-size: 12px; color: var(--muted); }
+.etf .dist { font-size: 22px; font-weight: 700; margin: 8px 0 2px; }
+.pista { position: relative; height: 8px; border-radius: 4px; background: var(--grid); margin: 6px 0 8px; }
+.pista .eje { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--axis); }
+.pista .llena { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+
+/* Gráficos */
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.chart { position: relative; width: 100%; margin-top: 6px; touch-action: pan-y; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 8px 10px;
+  font-size: 13px; box-shadow: 0 6px 18px rgba(0,0,0,.14); white-space: nowrap; display: none; z-index: 2; }
+.tip b { display: block; margin-bottom: 4px; }
+.tip span { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+.tip strong { color: var(--ink); }
+.cab-graf { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.linkbtn { background: none; border: 1px solid var(--ring); color: var(--ink-2); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+
+/* Calendario de "si hubieras empezado ese mes" */
+.segm { display: inline-flex; background: var(--plane); border: 1px solid var(--ring); border-radius: 999px; padding: 3px; }
+.segm button { border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.segm button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 650; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.cifras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.cifras > div { background: var(--plane); border-radius: 10px; padding: 10px 12px; }
+.cifras .v { font-size: 24px; font-weight: 700; white-space: nowrap; }
+.cal { display: grid; grid-template-columns: 38px repeat(12, 1fr); gap: 3px; max-width: 560px; }
+.cal .mes, .cal .ano { font-size: 11px; color: var(--muted); text-align: center; align-self: center; }
+.cal .ano { text-align: left; font-variant-numeric: tabular-nums; }
+.celda { aspect-ratio: 1; border-radius: 4px; border: 0; padding: 0; cursor: pointer; }
+.celda.gana { background: var(--good); }
+.celda.pierde { background: var(--bad-tint); box-shadow: inset 0 0 0 2px var(--bad); }
+.celda.igual { background: var(--grid); }
+.celda.vacia { background: none; cursor: default; }
+.celda.activa { outline: 2px solid var(--ink); outline-offset: 1px; }
+.ley-cal { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+.ley-cal span { display: inline-flex; align-items: center; gap: 6px; }
+.ley-cal i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.detalle { min-height: 3em; margin-top: 10px; font-size: 15px; }
+
+/* Crisis */
+.crisis { padding: 12px 0; border-top: 1px solid var(--grid); }
+.crisis:first-child { border-top: 0; padding-top: 0; }
+.crisis .tit { font-weight: 650; }
+.crisis .cuando { font-size: 13px; color: var(--muted); }
+.barra-fila { display: grid; grid-template-columns: 42px 1fr 64px; align-items: center; gap: 8px; margin-top: 6px; font-size: 14px; }
+.barra-fila .pista2 { height: 14px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+.barra-fila .barra { height: 100%; border-radius: 4px; }
+.barra-fila .val { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Tablas y listas */
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 15px; }
+th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--grid); }
+th { color: var(--ink-2); font-weight: 600; font-size: 13px; }
+td.n, th.n { text-align: right; }
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+.lista li:last-child { border-bottom: 0; }
+.lista .izq { min-width: 0; }
+.lista .der { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hitos { list-style: none; margin: 0; padding: 0; }
+.hitos li { position: relative; padding: 0 0 14px 22px; }
+.hitos li::before { content: ""; position: absolute; left: 4px; top: 7px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.hitos li::after { content: ""; position: absolute; left: 8px; top: 20px; bottom: 0; width: 2px; background: var(--grid); }
+.hitos li:last-child::after { display: none; }
+.hitos b { display: block; }
+
+/* Bot o fija */
+.dos { display: grid; gap: 12px; margin-top: 12px; }
+@media (min-width: 760px) { .dos { grid-template-columns: 1fr 1fr; } }
+.opcion { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 16px; border-top: 5px solid var(--c); }
+.opcion h3 { margin: 0 0 4px; font-size: 18px; }
+.opcion dl { margin: 10px 0 0; }
+.opcion dt { font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+.opcion dd { margin: 2px 0 0; font-weight: 600; }
+.eleccion { border-left: 5px solid var(--series-1); }
+.eleccion .v { font-size: 26px; font-weight: 700; }
+/* Desde cero */
+.bienvenida { display: flex; gap: 12px; align-items: center; justify-content: space-between; cursor: pointer; border-left: 5px solid var(--series-3); }
+.bienvenida b { display: block; }
+.bienvenida .flecha { font-size: 22px; color: var(--ink-2); }
+.cero h2 { margin-top: 30px; }
+.cero .lead { font-size: 17px; }
+.paso { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; }
+.paso .n { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 15px; }
+.cajas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+@media (min-width: 760px) { .cajas { grid-template-columns: repeat(3, 1fr); } }
+.caja { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 12px; font-size: 15px; }
+.caja b { display: block; font-size: 16px; margin-bottom: 2px; }
+.caja .puntos { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.puntos i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--grid); margin-right: 3px; vertical-align: middle; }
+.puntos i.on { background: var(--ink-2); }
+.caja.nuestra { border-color: var(--accent); }
+.ejemplo { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 14px; margin-top: 12px; }
+.ejemplo .res { margin-top: 8px; font-weight: 650; }
+.ejemplo svg { display: block; width: 100%; height: auto; margin-top: 8px; }
+.cita { font-size: 18px; font-weight: 650; line-height: 1.4; border-left: 4px solid var(--accent); padding: 4px 0 4px 14px; margin: 16px 0; }
+.estudio { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+.estudio .quien { font-weight: 700; font-size: 16px; }
+.estudio .titulo { font-style: italic; margin-top: 2px; }
+.estudio .donde { font-size: 13px; color: var(--muted); }
+.estudio p { margin: 8px 0 0; font-size: 15px; }
+.enlaces { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.enlaces a { display: inline-block; border: 1px solid var(--ring); border-radius: 999px; padding: 5px 12px; font-size: 13px; color: var(--accent);
+  text-decoration: none; }
+.enlaces a:hover { background: var(--plane); }
+.glosario dt { font-weight: 650; margin-top: 10px; }
+.glosario dd { margin: 2px 0 0; color: var(--ink-2); }
+.prosa p, .prosa li { max-width: 70ch; }
+.prosa li { margin: 6px 0; }
+footer { color: var(--muted); font-size: 12px; margin: 32px 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Bot de ETF</h1>
+    <div class="sub" id="sub"></div>
+  </div>
+  <button class="icono" id="tema" type="button">Tema: auto</button>
+</header>
+<nav class="tabs" role="tablist" aria-label="Secciones">
+  <button role="tab" aria-selected="true" data-p="hoy"><svg viewBox="0 0 24 24"><path d="M3 12l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Hoy</button>
+  <button role="tab" aria-selected="false" data-p="cero"><svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 00-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0012 3z"/></svg>Desde cero</button>
+  <button role="tab" aria-selected="false" data-p="historia"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/></svg>Historia</button>
+  <button role="tab" aria-selected="false" data-p="botofija"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7a3 3 0 006 0z"/><path d="M19 7l-3 7a3 3 0 006 0z"/></svg>Bot o fija</button>
+  <button role="tab" aria-selected="false" data-p="como"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7.5v.5"/></svg>Cómo</button>
+  <button role="tab" aria-selected="false" data-p="diario"><svg viewBox="0 0 24 24"><path d="M6 3h11a2 2 0 012 2v16H8a2 2 0 01-2-2z"/><path d="M6 19a2 2 0 012-2h11"/></svg>Diario</button>
+</nav>
+<main>
+<div id="aviso"></div>
+
+<section class="panel" id="hoy">
+  <div class="card bienvenida" id="bienvenida" role="button" tabindex="0">
+    <div><b>¿Primera vez aquí?</b><span class="sub">Empieza por «Desde cero»: qué hace este bot, explicado sin palabras técnicas.</span></div>
+    <span class="flecha" aria-hidden="true">›</span>
+  </div>
+  <div class="card hero">
+    <div class="k">Valor del bot (dinero ficticio)</div>
+    <div class="v num" id="valor"></div>
+    <div class="sub" id="valor-sub"></div>
+    <div class="mini">
+      <div><div class="k">Cartera fija ajustada</div><div class="v num" id="m-fija">—</div></div>
+      <div><div class="k">Diferencia (bot − fija)</div><div class="v num" id="m-d">—</div></div>
+    </div>
+    <div id="gauge"></div>
+    <div class="peq" id="gauge-txt"></div>
+  </div>
+  <div class="card">
+    <div class="fila-decision">
+      <div><div class="sub">Próxima decisión</div><div style="font-size:20px;font-weight:700" id="prox"></div></div>
+      <div class="chip in" id="prox-dias" style="background:var(--plane);color:var(--ink-2)"></div>
+    </div>
+  </div>
+
+  <h2>Si el mes cerrara hoy</h2>
+  <p class="sub">El bot compra lo que está por encima de su media de 10 meses y vende lo que está por debajo. Solo cuenta el último día de bolsa del mes.</p>
+  <div class="etfs" id="etfs"></div>
+
+  <div id="bloque-graf-hoy">
+    <h2>Bot frente a la cartera fija</h2>
+    <div class="card" id="graf-hoy"></div>
+  </div>
+
+  <div id="bloque-hitos">
+    <h2>Próximas fechas</h2>
+    <div class="card"><ul class="hitos" id="hitos"></ul></div>
+  </div>
+
+  <h2>Órdenes simuladas</h2>
+  <div class="card"><ul class="lista" id="ordenes"></ul></div>
+
+  <h2>Control del proceso</h2>
+  <div class="card"><ul class="lista" id="proceso"></ul></div>
+</section>
+
+<section class="panel cero prosa" id="cero" hidden>
+  <h2 style="margin-top:16px">Explicado desde cero</h2>
+  <p class="lead">Para Esther, y para cualquiera que no sepa nada de inversiones. Se lee en 5 minutos.</p>
+
+  <h2>1. Guardar o invertir</h2>
+  <p>Si guardas 1.000 € en un cajón, dentro de 10 años seguirán siendo 1.000 €. Pero las cosas suben de precio cada año (eso es la
+    <b>inflación</b>), así que con ese dinero podrás comprar menos.</p>
+  <div class="ejemplo"><b>Ejemplo:</b> si los precios suben un 2,5 % al año, dentro de 10 años los 1.000 € del cajón comprarán lo mismo
+    que hoy unos 780 €.</div>
+  <p><b>Invertir</b> es poner el dinero en algo que pueda crecer. La otra cara: también puede bajar. Nadie puede prometer que suba.</p>
+
+  <h2>2. ¿En qué se puede invertir?</h2>
+  <div class="cajas">
+    <div class="caja"><b>Acciones</b>Un trocito de una empresa. Si a la empresa le va bien, tu trocito vale más; si le va mal, menos.
+      <div class="puntos"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i> se mueve</div></div>
+    <div class="caja"><b>Bonos</b>Prestarle dinero a un país o a una empresa, que te lo devuelve con intereses. Más tranquilo, gana menos.
+      <div class="puntos"><i class="on"></i><i class="on"></i><i></i><i></i><i></i> se mueve</div></div>
+    <div class="caja"><b>Oro</b>Un metal que la gente compra cuando tiene miedo. Suele aguantar cuando todo lo demás cae.
+      <div class="puntos"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i> se mueve</div></div>
+    <div class="caja"><b>Criptomonedas</b>Dinero digital, como el bitcoin. Sube y baja muchísimo. Lo probamos y lo descartamos.
+      <div class="puntos"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i> se mueve</div></div>
+    <div class="caja"><b>Efectivo</b>Dinero en la cuenta. No gana nada, pero tampoco baja (salvo por la inflación).
+      <div class="puntos"><i></i><i></i><i></i><i></i><i></i> se mueve</div></div>
+  </div>
+  <p class="peq">Los puntos indican cuánto se mueve el precio: cuantos más, más subidas y bajadas fuertes.</p>
+
+  <h2>3. ¿Qué es un ETF? Una cesta</h2>
+  <p>Comprar acciones de cientos de empresas una a una sería carísimo. Un <b>ETF</b> es una cesta que ya trae muchas dentro: compras una sola
+    cosa y tienes un poquito de todas. Se compra y se vende en la bolsa, como una acción.</p>
+  <p>Este proyecto usa solo 4 cestas:</p>
+  <div class="card"><ul class="lista">
+    <li><span class="izq"><b>Bolsa mundial</b><div class="peq">Unas 1.400 grandes empresas de países ricos: Apple, Nestlé, Toyota…</div></span></li>
+    <li><span class="izq"><b>Bolsa emergente</b><div class="peq">Miles de empresas de países como China, India, Taiwán o Brasil.</div></span></li>
+    <li><span class="izq"><b>Bonos del euro</b><div class="peq">Préstamos a los gobiernos de la zona euro: Alemania, Francia, Italia, España…</div></span></li>
+    <li><span class="izq"><b>Oro</b><div class="peq">Cada participación es 1 gramo de oro guardado en una cámara acorazada en Fráncfort.</div></span></li>
+  </ul></div>
+
+  <h2>4. El problema: las caídas</h2>
+  <p>A largo plazo, estas cestas han subido. Pero a veces caen mucho y durante meses. <span id="caida-2008"></span></p>
+  <p id="caida-fija"></p>
+
+  <h2>5. La idea del bot: seguir la tendencia</h2>
+  <p class="cita">«Si algo lleva meses subiendo, me quedo. Si lleva meses bajando, me salgo y espero.»</p>
+  <p>Es como mirar el tiempo: si llevamos semanas de sol, sales sin paraguas; si llevamos semanas de lluvia, mejor esperar.
+    No adivinas el futuro: solo sigues lo que está pasando.</p>
+  <p><b>La idea no es nuestra:</b> la propuso un gestor estadounidense, Mebane Faber, en un estudio de 2007. Nosotros la hemos comprobado
+    con datos más recientes. Los estudios y enlaces están en la pestaña «Cómo», apartado <a href="#/como" id="ir-estudios">«En qué estudios se basa»</a>.</p>
+  <p>Para saber si algo «lleva meses subiendo», el bot hace una cuenta muy sencilla <b>una vez al mes</b>, el último día de bolsa:</p>
+  <div class="paso"><span class="n">1</span><div>Apunta el precio de cada cesta al cierre de los <b>últimos 10 meses</b> (uno por mes; el último es el de hoy).</div></div>
+  <div class="paso"><span class="n">2</span><div>Calcula la <b>media</b>: los suma y divide entre 10.</div></div>
+  <div class="paso"><span class="n">3</span><div>Si el precio de hoy está <b>por encima</b> de la media, va hacia arriba: la compra o la mantiene.
+    Si está <b>por debajo</b>, va hacia abajo: la vende y guarda el dinero.</div></div>
+  <div class="ejemplo" id="ej-a"></div>
+  <div class="ejemplo" id="ej-b"></div>
+
+  <h2>6. Así lo vio el bot en la crisis de 2008</h2>
+  <p class="sub">La bolsa mundial, como si hubieras puesto 100 € en enero de 2007. Las zonas rojas son los meses en que el bot estaba fuera,
+    con el dinero guardado.</p>
+  <div class="card" id="graf-2008"></div>
+  <div id="texto-2008"></div>
+
+  <h2>7. Con 1.000 € de mentira, este mes</h2>
+  <p>El bot reparte el dinero en 4 partes de unos 250 €, una por cesta. Si el mes acabara hoy:</p>
+  <div class="card"><ul class="lista" id="cero-hoy"></ul></div>
+  <p class="peq">Solo se compran participaciones enteras, así que a veces sobran unos euros. Y cada compra o venta cuesta unos 2 € de comisión.</p>
+
+  <h2>8. ¿Por qué un bot y no hacerlo a mano?</h2>
+  <ul>
+    <li><b>No se asusta ni se emociona:</b> aplica la regla siempre, también cuando las noticias dan miedo.</li>
+    <li><b>No se olvida:</b> cada día de bolsa descarga los precios, hace las cuentas y actualiza esta web él solo.</li>
+    <li><b>Todo queda apuntado:</b> cada decisión, cada orden y cada comisión.</li>
+  </ul>
+
+  <h2>9. ¿Funciona? Lo que sabemos</h2>
+  <p>Lo hemos probado con lo que pasó de verdad desde 2005, como si el bot hubiera existido entonces:</p>
+  <div class="cajas" id="cero-resultado"></div>
+  <p><b>En resumen:</b> el bot gana menos a largo plazo, pero sufre mucho menos en las crisis. Es como un seguro: pagas un poco en los años buenos
+    para estar más protegido en los malos.</p>
+
+  <h2>10. Cómo hemos llegado hasta aquí</h2>
+  <p>Como con un coche nuevo: primero se diseña, luego se prueba en el simulador, luego en un circuito cerrado y solo al final sale a la carretera.</p>
+  <div class="paso"><span class="n">1</span><div><b>Investigar (octubre de 2026).</b> Miramos muchas ideas: copiar a los grandes inversores, criptomonedas, divisas…
+    Descartamos las prohibidas en España, las demasiado arriesgadas y las que solo funcionan para profesionales.</div></div>
+  <div class="paso"><span class="n">2</span><div><b>Escribir las reglas antes de probar.</b> Para no hacernos trampas: si pruebas mil reglas, alguna parecerá buena por pura suerte.</div></div>
+  <div class="paso"><span class="n">3</span><div><b>El simulador: probar con el pasado.</b> Dos bots de criptomonedas suspendieron y se descartaron sin perder ni un euro.
+    Este bot de ETF aprobó con 20 años de datos.</div></div>
+  <div class="paso"><span class="n">4</span><div><b>Un examen sorpresa.</b> Guardamos 2 años de datos sin mirarlos y al final los usamos como examen: el bot ganó un 25,7 % y aprobó.</div></div>
+  <div class="paso"><span class="n">5</span><div><b>El circuito cerrado (ahora).</b> 3 meses con dinero de mentira y precios reales, de noviembre de 2026 a enero de 2027.</div></div>
+  <div class="paso"><span class="n">6</span><div><b>La carretera (febrero de 2027).</b> Si todo ha funcionado, se decide si se ponen 1.000 € de verdad.</div></div>
+
+  <h2>11. Lo que puede salir mal</h2>
+  <ul id="cero-riesgos"></ul>
+  <p class="peq">Nada de esto es un consejo de inversión. Es un proyecto personal para aprender, de momento con dinero ficticio.</p>
+
+  <h2>Palabras que salen en esta web</h2>
+  <dl class="glosario">
+    <dt>Acción</dt><dd>Un trocito de una empresa.</dd>
+    <dt>Bono</dt><dd>Un préstamo a un país o empresa, que lo devuelve con intereses.</dd>
+    <dt>ETF</dt><dd>Una cesta con muchas acciones o bonos dentro, que se compra como una sola cosa.</dd>
+    <dt>Media de 10 meses</dt><dd>El precio medio de los últimos 10 cierres de mes. Si el precio está por encima, «va hacia arriba».</dd>
+    <dt>Dentro / fuera</dt><dd>Si el bot tiene esa cesta comprada (dentro) o el dinero guardado (fuera).</dd>
+    <dt>Cartera fija</dt><dd>Comprar las 4 cestas a partes iguales y no tocarlas (solo se reajustan una vez al año). Es con lo que se compara el bot.</dd>
+    <dt>Cartera fija ajustada</dt><dd>La misma, pero con solo dos tercios invertidos, porque el bot también tiene de media un tercio guardado. Así la comparación es justa.</dd>
+    <dt>Comisión</dt><dd>Lo que cobra el bróker por cada compra o venta (aquí, unos 2 €).</dd>
+    <dt>Bróker</dt><dd>La empresa a través de la que se compran y venden los ETF (aquí sería Interactive Brokers).</dd>
+    <dt>Backtest</dt><dd>Probar una regla con lo que pasó en el pasado, como en un simulador.</dd>
+    <dt>Dinero de mentira (paper trading)</dt><dd>Hacerlo todo como si fuera real, pero sin dinero de verdad.</dd>
+    <dt>Caída desde el máximo</dt><dd>Cuánto has bajado desde el punto más alto al que llegaste.</dd>
+  </dl>
+</section>
+
+<section class="panel" id="historia" hidden>
+  <h2 style="margin-top:16px">1.000 € desde 2005</h2>
+  <p class="sub">Backtest con las mismas reglas y comisiones. El bot gana menos a largo plazo, pero cae mucho menos.</p>
+  <div class="card" id="graf-curva"></div>
+
+  <h2>Cuánto llegó a caer</h2>
+  <p class="sub">Pérdida desde el último máximo en cada momento. Cuanto más abajo, peor.</p>
+  <div class="card" id="graf-caida"></div>
+
+  <h2>¿Y si hubieras empezado cualquier mes?</h2>
+  <p class="sub">Cada cuadro es un mes de inicio: 1.000 € durante 6 meses. Toca un cuadro para ver el resultado.</p>
+  <div class="card">
+    <div class="segm" role="group" aria-label="Periodo">
+      <button type="button" data-desde="2023-10-01" aria-pressed="true">Últimos 3 años</button>
+      <button type="button" data-desde="0000" aria-pressed="false">Desde 2002</button>
+    </div>
+    <div class="cifras" id="cifras"></div>
+    <div class="cal" id="cal"></div>
+    <div class="ley-cal"><span><i style="background:var(--good)"></i>El bot ganó dinero</span>
+      <span><i style="background:var(--bad-tint);box-shadow:inset 0 0 0 2px var(--bad)"></i>El bot perdió dinero</span>
+      <span id="ley-igual" hidden><i style="background:var(--grid)"></i>Igual: todo en efectivo</span></div>
+    <div class="detalle" id="detalle"></div>
+  </div>
+
+  <h2>Cuando todo se hunde</h2>
+  <p class="sub">Las 5 peores épocas de la cartera fija (6 meses) y qué hizo el bot.</p>
+  <div class="card" id="crisis"></div>
+
+  <h2>Lo peor que ha pasado</h2>
+  <div class="card tabla"><table id="extremos"></table></div>
+  <div class="aviso" id="mc"></div>
+
+  <h2>El último año, orden a orden</h2>
+  <p class="sub">Qué habría hecho el bot con 1.000 € de octubre de 2025 a septiembre de 2026.</p>
+  <div class="card" id="graf-seco"></div>
+  <div class="card"><ul class="lista" id="ordenes-seco"></ul></div>
+</section>
+
+<section class="panel" id="botofija" hidden>
+  <h2 style="margin-top:16px">Dos maneras de invertir los mismos 1.000 €</h2>
+  <p class="sub">Los mismos 4 ETF: bolsa mundial, bolsa emergente, bonos del euro y oro.</p>
+  <div class="dos" id="dos"></div>
+  <div class="card eleccion" id="eleccion"></div>
+  <h2>¿Por qué se compara con la "fija ajustada"?</h2>
+  <div class="card prosa">
+    <p>El bot está invertido unos dos tercios del tiempo; el resto lo tiene en efectivo. Compararlo con la cartera fija entera sería injusto:
+      la fija arriesga más. La <b>cartera fija ajustada</b> es la misma cartera con solo un 66,8 % invertido, el mismo riesgo medio que el bot.</p>
+    <p><b>Ejemplo:</b> si la cartera fija gana un 6 %, la ajustada gana un 4 %. Si el bot gana un 3 %, la diferencia es −1 punto.</p>
+    <p id="regla"></p>
+  </div>
+</section>
+
+<section class="panel prosa" id="como" hidden>
+  <h2 style="margin-top:16px">Qué hace el bot</h2>
+  <p>Reparte el dinero entre 4 ETF europeos, unos 250 € de cada 1.000 €: bolsa mundial, bolsa de países emergentes, bonos de gobierno de la zona euro y oro.
+     El último día de bolsa de cada mes mira cada ETF:</p>
+  <ul>
+    <li><b>Si su precio está por encima de su media de los últimos 10 meses,</b> lo mantiene o lo compra.</li>
+    <li><b>Si está por debajo,</b> lo vende y deja ese dinero en efectivo.</li>
+  </ul>
+  <p>Las órdenes se ejecutan a la apertura del primer día de bolsa del mes siguiente, con acciones enteras y la comisión real de Interactive Brokers
+     (mínimo de 1,25 € por orden más tasas). Unas 6 órdenes al año. Lo ganado se reinvierte: cada compra usa el 25 % del valor de la cartera en ese momento.</p>
+  <p><b>Por qué funciona (cuando funciona):</b> las grandes caídas suelen durar meses. Salir cuando el precio pierde su tendencia evita la mayor parte.
+     A cambio, en años tranquilos se gana menos que sin hacer nada.</p>
+
+  <h2>Cómo hemos llegado hasta aquí</h2>
+  <h3>1. Investigación (octubre de 2026)</h3>
+  <p>Revisamos todas las formas de hacer un bot: copiar a grandes carteras, adelantarse a órdenes ajenas, mercados de predicción, cripto, divisas, acciones y ETF.
+     Descartamos lo ilegal o inaccesible desde España (Polymarket y Kalshi están bloqueados por la DGOJ; adelantarse a órdenes es cosa de profesionales
+     con riesgo de abuso de mercado) y lo que la evidencia desaconseja (bots de grid, IA decidiendo sola, divisas con apalancamiento).</p>
+  <h3>2. Un método para no engañarnos</h3>
+  <ul>
+    <li>Cada idea se escribe y se congela <b>antes</b> de probarla con datos.</li>
+    <li>Cada prueba queda registrada, también las que salen mal: probar muchas cosas hace que alguna parezca buena por suerte.</li>
+    <li>Los últimos 2 años de datos se guardaron sin mirar: fueron el examen final.</li>
+    <li>Cada estrategia tiene que ganar a la alternativa de no hacer nada con el mismo riesgo.</li>
+  </ul>
+  <h3>3. Cripto: dos intentos, dos suspensos (sin perder dinero)</h3>
+  <ul>
+    <li><b>Tendencia sobre 15 criptomonedas:</b> ganaba dinero, pero con caídas de hasta el 51 % y peor que mantener una parte en bitcoin.</li>
+    <li><b>Tendencia sobre bitcoin y ethereum con control de riesgo:</b> muy buena en el pasado, pero suspendió el examen final
+        (−5,3 % en un año muy bajista). Se aplicó la regla y se cerró la línea de cripto.</li>
+  </ul>
+  <h3>4. ETF: aprobado, con matices</h3>
+  <ul>
+    <li><b>2005-2024:</b> 5,8 % anual con una caída máxima del 14 %, frente al 7,9 % y −25 % de la cartera fija.</li>
+    <li><b>Examen final (oct-2024 → sep-2026, datos no vistos):</b> +25,7 % con una caída máxima del 9 %; superó a la cartera fija ajustada por 4 puntos.</li>
+    <li><b>El matiz:</b> por unidad de riesgo no gana a la cartera fija. Su valor es protegerse en las crisis.</li>
+  </ul>
+  <h3>5. La prueba actual</h3>
+  <p>Tres meses con dinero ficticio y datos reales (noviembre de 2026 a enero de 2027). En febrero de 2027 se decide si pasar a dinero real
+     (1.000 € en Interactive Brokers), quedarse con la cartera fija o parar. Criterios fijados antes de empezar: coincidencia del 100 % con el backtest
+     todos los meses y no quedar más de 2,48 puntos por debajo de la cartera fija ajustada.</p>
+  <p><b>Lo que la prueba no puede decir:</b> en 3 meses no se demuestra si el bot gana a la cartera fija; sirve para comprobar que todo funciona con datos reales.</p>
+  <h3>6. Sin depender de nadie</h3>
+  <p>Todo se ejecuta solo cada día de bolsa (GitHub), con precios de Yahoo, y se publica aquí. Si algo falla o los precios dejan de llegar,
+     llega un correo de aviso; al arreglarlo, el bot se pone al día sin perder nada.</p>
+
+  <h2 id="estudios">En qué estudios se basa</h2>
+  <p>El bot no se inventa nada: aplica una regla publicada por otros y la comprueba con métodos también publicados.
+    Los estudios originales están en inglés; al final hay dos lecturas en español.</p>
+
+  <h3>La regla: seguir la tendencia</h3>
+  <div class="estudio">
+    <div class="quien">Mebane T. Faber · 2007</div>
+    <div class="titulo">«A Quantitative Approach to Tactical Asset Allocation»</div>
+    <div class="donde">The Journal of Wealth Management, primavera de 2007 (primera versión, mayo de 2006)</div>
+    <p><b>Qué dice:</b> cada mes, comparar cada activo con su media de 10 meses (unos 200 días de bolsa). Por encima, invertido; por debajo,
+      en efectivo. Lo probó con la bolsa de EE. UU. desde 1900 y con 5 tipos de activo (bolsa de EE. UU., bolsa del resto del mundo, bonos,
+      materias primas e inmobiliario) desde los años 70: ganaba parecido a no hacer nada, con caídas mucho menores. Fue durante años uno de los
+      estudios más descargados de SSRN, la mayor biblioteca abierta de estudios de economía.</p>
+    <p><b>En este proyecto:</b> es la regla del bot. La hemos aplicado a 4 ETF europeos, en euros, con comisiones reales, de 2005 a 2026,
+      casi todo después de que se publicara. Se confirma que cae mucho menos (−14 % frente a −25 %), pero ya no gana más por cada unidad de riesgo.</p>
+    <div class="enlaces">
+      <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=962461" target="_blank" rel="noopener noreferrer">Estudio original (inglés)</a>
+      <a href="https://www.rankia.com/blog/erre/363607-eterna-polemica-mejor-comprar-mantener-podemos-incrementar-nuestra-rentabilidad-uso-medias-movi" target="_blank" rel="noopener noreferrer">Explicado en español (Rankia)</a>
+    </div>
+  </div>
+  <div class="estudio">
+    <div class="quien">Tobias J. Moskowitz, Yao Hua Ooi y Lasse H. Pedersen · 2012</div>
+    <div class="titulo">«Time Series Momentum»</div>
+    <div class="donde">Journal of Financial Economics, vol. 104, n.º 2, págs. 228-250</div>
+    <p><b>Qué dice:</b> en 58 mercados (bolsas, bonos, divisas y materias primas), lo que ha subido en los últimos 1 a 12 meses tiende a seguir
+      subiendo un tiempo, y lo que ha bajado, a seguir bajando. Funciona sobre todo en los momentos más extremos del mercado.</p>
+    <p><b>En este proyecto:</b> confirma con muchos más mercados que seguir la tendencia no es una casualidad de un solo índice.</p>
+    <div class="enlaces">
+      <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2089463" target="_blank" rel="noopener noreferrer">Estudio (inglés)</a>
+      <a href="https://doi.org/10.1016/j.jfineco.2011.11.003" target="_blank" rel="noopener noreferrer">En la revista</a>
+    </div>
+  </div>
+
+  <h3>El método: no engañarnos con el pasado</h3>
+  <div class="estudio">
+    <div class="quien">David H. Bailey y Marcos López de Prado · 2014</div>
+    <div class="titulo">«The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting and Non-Normality»</div>
+    <div class="donde">The Journal of Portfolio Management, vol. 40, n.º 5, págs. 94-107</div>
+    <p><b>Qué dice:</b> si pruebas muchas estrategias, alguna parecerá buena por pura suerte. Propone una corrección que tiene en cuenta cuántas
+      pruebas has hecho. Marcos López de Prado es un economista español, doctor por la Universidad Complutense de Madrid.</p>
+    <p><b>En este proyecto:</b> por eso cada prueba queda apuntada en un registro, también las que salen mal, y el resultado se corrige con
+      el número de pruebas.</p>
+    <div class="enlaces"><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2460551" target="_blank" rel="noopener noreferrer">Estudio (inglés)</a></div>
+  </div>
+  <div class="estudio">
+    <div class="quien">David H. Bailey, Jonathan M. Borwein, Marcos López de Prado y Qiji Jim Zhu · 2017</div>
+    <div class="titulo">«The Probability of Backtest Overfitting»</div>
+    <div class="donde">Journal of Computational Finance (versión de trabajo de 2013)</div>
+    <p><b>Qué dice:</b> una forma de medir la probabilidad de que una estrategia solo funcione en los datos con los que se eligió.</p>
+    <p><b>En este proyecto:</b> la usamos para validar los bots de criptomonedas, que se descartaron.</p>
+    <div class="enlaces"><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2326253" target="_blank" rel="noopener noreferrer">Estudio (inglés)</a></div>
+  </div>
+  <div class="estudio">
+    <div class="quien">R. David McLean y Jeffrey Pontiff · 2016</div>
+    <div class="titulo">«Does Academic Research Destroy Stock Return Predictability?»</div>
+    <div class="donde">The Journal of Finance, vol. 71, n.º 1, págs. 5-32</div>
+    <p><b>Qué dice:</b> estudiaron 97 estrategias publicadas en revistas. Después de publicarse, rinden de media un 58 % menos: cuando mucha
+      gente las conoce y las usa, parte de la ventaja desaparece.</p>
+    <p><b>En este proyecto:</b> explica lo que vimos con la regla de Faber: sigue protegiendo en las caídas, pero ya no gana más por riesgo.</p>
+    <div class="enlaces"><a href="https://doi.org/10.1111/jofi.12365" target="_blank" rel="noopener noreferrer">En la revista (inglés)</a></div>
+  </div>
+
+  <h3>Las críticas</h3>
+  <div class="estudio">
+    <div class="quien">Stefano Marmi, Claudio Pacati, Roberto Renò y Wolfgang Risso · 2013</div>
+    <div class="titulo">«A quantitative approach to Faber's tactical asset allocation»</div>
+    <div class="donde">International Journal of Computational Economics and Econometrics, vol. 3, n.º 1-2, págs. 91-101</div>
+    <p><b>Qué dice:</b> revisan el estudio de Faber con miles de simulaciones y concluyen que no demuestra que se pueda «ganar al mercado»:
+      piden prudencia con este tipo de reglas.</p>
+    <p><b>En este proyecto:</b> coincide con lo que hemos medido nosotros. Por eso el bot se presenta como un seguro contra las caídas, no
+      como una forma de ganar más.</p>
+    <div class="enlaces"><a href="https://ideas.repec.org/a/ids/ijcome/v3y2013i1-2p91-101.html" target="_blank" rel="noopener noreferrer">Ficha del estudio (inglés)</a></div>
+  </div>
+
+  <h3>Para leer en español</h3>
+  <div class="estudio">
+    <div class="quien">CNMV · Comisión Nacional del Mercado de Valores</div>
+    <div class="titulo">«Los fondos cotizados en bolsa (ETF)»</div>
+    <p>Guía oficial del supervisor español: qué son los ETF, qué tipos hay, sus riesgos, cómo se compran y cómo tributan.</p>
+    <div class="enlaces"><a href="https://www.cnmv.es/DocPortal/Publicaciones/Guias/LosFondosCotizadosEnBolsa%28ETF%29.pdf" target="_blank" rel="noopener noreferrer">Guía en PDF</a></div>
+  </div>
+  <div class="estudio">
+    <div class="quien">Enrique Roca · Rankia · 2009</div>
+    <div class="titulo">«La eterna polémica: ¿es mejor comprar y mantener o podemos incrementar nuestra rentabilidad con el uso de medias móviles?»</div>
+    <p>Resume en español el estudio de Faber, con sus tablas: comprar y mantener frente a seguir la media.</p>
+    <div class="enlaces"><a href="https://www.rankia.com/blog/erre/363607-eterna-polemica-mejor-comprar-mantener-podemos-incrementar-nuestra-rentabilidad-uso-medias-movi" target="_blank" rel="noopener noreferrer">Leer el artículo</a></div>
+  </div>
+</section>
+
+<section class="panel" id="diario" hidden>
+  <h2 style="margin-top:16px">Diario</h2>
+  <p class="sub">Una línea por día de bolsa, escrita por la tarea automática.</p>
+  <div class="card"><ul class="lista" id="lista-diario"></ul></div>
+</section>
+
+<footer id="pie"></footer>
+</main>
+
+<script>
+const DATOS = {"generado":"2026-10-26T11:58+00:00","fecha_datos":"2026-10-31","inicio_medicion":"2026-11-01","proxima_decision":"2026-10-31","capital_inicial":1000.0,"valor":1000.0,"caja":1000.0,"posiciones":[{"activo":"RV_MUNDIAL","etf":"EUNL en Xetra (mismo fondo)","acciones":0.0,"precio":129.84,"valor":0.0,"senal":{"fecha":"2026-10-31","cierre":129.83999633789062,"media":120.93899993896484,"distancia":0.07359906,"dentro":true}},{"activo":"RV_EMERGENTE","etf":"IS3N en Xetra (mismo fondo)","acciones":0.0,"precio":44.98,"valor":0.0,"senal":{"fecha":"2026-10-31","cierre":44.981998443603516,"media":45.08609962463379,"distancia":-0.00230894,"dentro":false}},{"activo":"BONOS_EUR","etf":"XGLE en Xetra (acumulación)","acciones":0.0,"precio":216.4,"valor":0.0,"senal":{"fecha":"2026-10-31","cierre":216.39999389648438,"media":221.47099761962892,"distancia":-0.02289692,"dentro":false}},{"activo":"ORO","etf":"4GLD en Xetra","acciones":0.0,"precio":115.36,"valor":0.0,"senal":{"fecha":"2026-10-31","cierre":115.36000061035156,"media":124.04700164794922,"distancia":-0.07002992,"dentro":false}}],"umbral":-0.0248,"exposicion_dev":0.668,"fin_prueba":"2027-01-31","decision_final":"febrero de 2027","hitos":[{"fecha":"2026-10-30","texto":"Primera decisión del bot (cierre del último día de bolsa de octubre)"},{"fecha":"2026-10-31","texto":"Tope para dejar escrita tu preferencia: protección en caídas o sencillez (antes de ver ningún resultado)"},{"fecha":"2026-11-02","texto":"Primeras órdenes simuladas, a la apertura"},{"fecha":"2026-12-01","texto":"Segunda tanda de órdenes"},{"fecha":"2027-01-04","texto":"Tercera y última tanda de órdenes de la prueba"},{"fecha":"2027-01-31","texto":"Fin de la prueba"},{"fecha":"2027-02-01","texto":"Decisión final: ¿seguir con el bot, pasar a cartera fija, o parar?"}],"series":null,"operaciones":[],"meses_procesados":[],"rentabilidad":null,"paridad":{"paridad_operaciones":null,"paridad_valor":null},"avisos":[],"historia":{"curva":[["2008-10",1000.0,1000.0],["2008-11",1000.0,1037.02],["2008-12",1000.0,1048.84],["2009-01",1000.0,1029.43],["2009-02",1000.0,1050.47],["2009-03",1000.0,1057.77],["2009-04",1000.0,1064.67],["2009-05",1000.0,1050.67],["2009-06",1000.0,1063.35],["2009-07",1000.0,1083.92],["2009-08",1000.0,1087.9],["2009-09",1000.0,1094.81],["2009-10",1000.0,1080.71],["2009-11",1000.0,1087.09],["2009-12",1000.0,1100.24],["2010-01",1000.0,1106.34],["2010-02",1000.0,1139.69],["2010-03",1000.0,1172.22],["2010-04",1000.0,1208.45],["2010-05",1000.0,1249.98],["2010-06",1000.0,1244.78],["2010-07",1000.0,1205.74],["2010-08",1000.0,1257.34],["2010-09",1000.0,1241.86],["2010-10",1000.0,1249.28],["2010-11",1000.0,1297.64],["2010-12",1000.0,1317.4],["2011-01",1000.0,1272.99],["2011-02",1000.0,1307.55],["2011-03",1000.0,1282.65],["2011-04",1000.0,1295.86],["2011-05",1000.0,1317.2],["2011-06",1000.0,1292.43],["2011-07",1000.0,1328.18],["2011-08",1000.0,1361.85],["2011-09",1000.0,1335.1],["2011-10",1000.0,1366.17],["2011-11",1000.0,1378.72],["2011-12",1000.0,1385.73],["2012-01",1000.0,1455.51],["2012-02",1000.0,1463.88],["2012-03",1000.0,1455.7],["2012-04",1000.0,1455.37],["2012-05",1000.0,1453.88],["2012-06",1000.0,1460.04],["2012-07",1000.0,1512.45],["2012-08",1000.0,1523.99],["2012-09",1000.0,1549.18],["2012-10",1000.0,1525.24],["2012-11",1000.0,1532.87],["2012-12",1000.0,1513.05],["2013-01",1000.0,1510.94],["2013-02",1000.0,1526.16],["2013-03",1000.0,1565.78],["2013-04",1000.0,1526.46],["2013-05",1000.0,1515.74],["2013-06",1000.0,1424.57],["2013-07",1000.0,1470.98],["2013-08",1000.0,1495.86],["2013-09",1000.0,1475.52],["2013-10",1000.0,1496.56],["2013-11",1000.0,1477.99],["2013-12",1000.0,1450.87],["2014-01",1000.0,1481.09],["2014-02",1000.0,1520.53],["2014-03",1000.0,1511.85],["2014-04",1000.0,1516.84],["2014-05",1000.0,1529.67],["2014-06",1000.0,1571.34],["2014-07",1000.0,1591.01],["2014-08",1000.0,1639.57],["2014-09",1000.0,1626.38],["2014-10",1000.0,1624.47],["2014-11",1000.0,1648.45],["2014-12",1000.0,1659.13],["2015-01",1000.0,1788.95],["2015-02",1000.0,1824.85],["2015-03",1000.0,1864.63],["2015-04",1000.0,1843.36],["2015-05",1000.0,1849.6],["2015-06",1000.0,1785.97],["2015-07",1000.0,1757.75],["2015-08",1000.0,1678.44],["2015-09",1000.0,1657.72],["2015-10",1000.0,1749.65],["2015-11",1000.0,1760.5],["2015-12",1000.0,1700.87],["2016-01",1000.0,1679.4],["2016-02",1000.0,1730.5],["2016-03",1000.0,1748.31],["2016-04",1000.0,1757.57],["2016-05",1000.0,1762.57],["2016-06",1000.0,1827.05],["2016-07",1000.0,1877.74],["2016-08",1000.0,1870.74],["2016-09",1000.0,1881.48],["2016-10",1000.0,1875.86],["2016-11",1000.0,1866.35],["2016-12",1000.0,1881.69],["2017-01",1000.0,1891.65],["2017-02",1000.0,1967.62],["2017-03",1000.0,1970.93],["2017-04",1000.0,1968.91],["2017-05",1000.0,1948.99],["2017-06",1000.0,1923.24],["2017-07",1000.0,1923.22],["2017-08",1000.0,1946.18],["2017-09",1000.0,1949.55],["2017-10",1000.0,1998.43],["2017-11",1000.0,1981.7],["2017-12",1000.0,2001.63],["2018-01",1000.0,2022.47],["2018-02",1000.0,2000.55],["2018-03",1000.0,1979.92],["2018-04",1000.0,2007.03],["2018-05",1000.0,2031.68],["2018-06",1000.0,1993.04],["2018-07",1000.0,2002.98],["2018-08",1000.0,1990.9],["2018-09",1000.0,1989.14],["2018-10",1000.0,1954.07],["2018-11",1000.0,1983.08],["2018-12",1000.0,1945.12],["2019-01",1000.0,2050.59],["2019-02",1000.0,2068.2],["2019-03",1000.0,2103.44],["2019-04",1000.0,2128.89],["2019-05",1000.0,2083.71],["2019-06",1000.0,2168.87],["2019-07",1000.0,2219.33],["2019-08",1000.0,2248.67],["2019-09",1000.0,2264.64],["2019-10",1000.0,2269.45],["2019-11",1000.0,2287.32],["2019-12",1000.0,2337.7],["2020-01",1000.0,2354.26],["2020-02",1000.0,2280.51],["2020-03",1000.0,2133.32],["2020-04",1000.0,2262.43],["2020-05",1000.0,2274.72],["2020-06",1000.0,2339.92],["2020-07",1000.0,2393.65],["2020-08",1000.0,2425.94],["2020-09",1000.0,2422.52],["2020-10",1000.0,2420.35],["2020-11",1000.0,2478.63],["2020-12",1000.0,2534.22],["2021-01",1000.0,2561.79],["2021-02",1000.0,2534.59],["2021-03",1000.0,2599.78],["2021-04",1000.0,2609.0],["2021-05",1000.0,2651.18],["2021-06",1000.0,2679.95],["2021-07",1000.0,2689.52],["2021-08",1000.0,2716.79],["2021-09",1000.0,2681.84],["2021-10",1000.0,2726.06],["2021-11",1000.0,2746.83],["2021-12",1000.0,2780.1],["2022-01",1000.0,2742.22],["2022-02",1000.0,2731.53],["2022-03",1000.0,2764.73],["2022-04",1000.0,2739.94],["2022-05",1000.0,2655.79],["2022-06",1000.0,2575.08],["2022-07",1000.0,2684.92],["2022-08",1000.0,2640.59],["2022-09",1000.0,2519.86],["2022-10",1000.0,2507.51],["2022-11",1000.0,2599.23],["2022-12",1000.0,2509.47],["2023-01",1000.0,2618.23],["2023-02",1000.0,2558.42],["2023-03",1000.0,2616.11],["2023-04",1000.0,2595.72],["2023-05",1000.0,2636.7],["2023-06",1000.0,2646.13],["2023-07",1000.0,2703.07],["2023-08",1000.0,2672.82],["2023-09",1000.0,2629.25],["2023-10",1000.0,2630.16],["2023-11",1000.0,2719.69],["2023-12",1000.0,2787.25],["2024-01",1000.0,2807.02],["2024-02",1000.0,2849.87],["2024-03",1000.0,2966.25],["2024-04",1000.0,2984.98],["2024-05",1000.0,2987.08],["2024-06",1000.0,3074.86],["2024-07",1000.0,3115.03],["2024-08",1000.0,3113.03],["2024-09",1000.0,3205.94],["2024-10",1000.0,3249.32],["2024-11",1000.0,3334.84],["2024-12",1000.0,3306.18],["2025-01",1000.0,3421.99],["2025-02",1000.0,3411.2],["2025-03",1000.0,3353.67],["2025-04",1000.0,3312.86],["2025-05",1000.0,3399.4],["2025-06",1000.0,3403.06],["2025-07",1000.0,3501.49],["2025-08",1000.0,3512.33],["2025-09",1000.0,3687.93],["2025-10",1000.0,3838.63],["2025-11",1000.0,3863.83],["2025-12",1000.0,3898.49],["2026-01",1000.0,4092.93],["2026-02",1000.0,4237.26],["2026-03",1000.0,3955.42],["2026-04",1000.0,4150.3],["2026-05",1000.0,4302.87],["2026-06",1000.0,4230.14],["2026-07",1000.0,4125.6],["2026-08",1000.0,4273.97],["2026-09",1000.0,4250.18],["2026-10",1000.0,4167.88]],"caida":[["2008-10",0.0,0.0],["2008-11",0.0,0.0],["2008-12",0.0,0.0],["2009-01",0.0,-0.018506],["2009-02",0.0,0.0],["2009-03",0.0,0.0],["2009-04",0.0,0.0],["2009-05",0.0,-0.01315],["2009-06",0.0,-0.00124],["2009-07",0.0,0.0],["2009-08",0.0,0.0],["2009-09",0.0,0.0],["2009-10",0.0,-0.012879],["2009-11",0.0,-0.007051],["2009-12",0.0,0.0],["2010-01",0.0,0.0],["2010-02",0.0,0.0],["2010-03",0.0,0.0],["2010-04",0.0,0.0],["2010-05",0.0,0.0],["2010-06",0.0,-0.00416],["2010-07",0.0,-0.035393],["2010-08",0.0,0.0],["2010-09",0.0,-0.012312],["2010-10",0.0,-0.00641],["2010-11",0.0,0.0],["2010-12",0.0,0.0],["2011-01",0.0,-0.03371],["2011-02",0.0,-0.007477],["2011-03",0.0,-0.026378],["2011-04",0.0,-0.01635],["2011-05",0.0,-0.000152],["2011-06",0.0,-0.018954],["2011-07",0.0,0.0],["2011-08",0.0,0.0],["2011-09",0.0,-0.019642],["2011-10",0.0,0.0],["2011-11",0.0,0.0],["2011-12",0.0,0.0],["2012-01",0.0,0.0],["2012-02",0.0,0.0],["2012-03",0.0,-0.005588],["2012-04",0.0,-0.005813],["2012-05",0.0,-0.006831],["2012-06",0.0,-0.002623],["2012-07",0.0,0.0],["2012-08",0.0,0.0],["2012-09",0.0,0.0],["2012-10",0.0,-0.015453],["2012-11",0.0,-0.010528],["2012-12",0.0,-0.023322],["2013-01",0.0,-0.024684],["2013-02",0.0,-0.014859],["2013-03",0.0,0.0],["2013-04",0.0,-0.025112],["2013-05",0.0,-0.031959],["2013-06",0.0,-0.090185],["2013-07",0.0,-0.060545],["2013-08",0.0,-0.044655],["2013-09",0.0,-0.057645],["2013-10",0.0,-0.044208],["2013-11",0.0,-0.056068],["2013-12",0.0,-0.073388],["2014-01",0.0,-0.054088],["2014-02",0.0,-0.028899],["2014-03",0.0,-0.034443],["2014-04",0.0,-0.031256],["2014-05",0.0,-0.023062],["2014-06",0.0,0.0],["2014-07",0.0,0.0],["2014-08",0.0,0.0],["2014-09",0.0,-0.008045],["2014-10",0.0,-0.00921],["2014-11",0.0,0.0],["2014-12",0.0,0.0],["2015-01",0.0,0.0],["2015-02",0.0,0.0],["2015-03",0.0,0.0],["2015-04",0.0,-0.011407],["2015-05",0.0,-0.008061],["2015-06",0.0,-0.042185],["2015-07",0.0,-0.05732],["2015-08",0.0,-0.099854],["2015-09",0.0,-0.110966],["2015-10",0.0,-0.061664],["2015-11",0.0,-0.055845],["2015-12",0.0,-0.087824],["2016-01",0.0,-0.099339],["2016-02",0.0,-0.071934],["2016-03",0.0,-0.062382],["2016-04",0.0,-0.057416],["2016-05",0.0,-0.054735],["2016-06",0.0,-0.020154],["2016-07",0.0,0.0],["2016-08",0.0,-0.003728],["2016-09",0.0,0.0],["2016-10",0.0,-0.002987],["2016-11",0.0,-0.008042],["2016-12",0.0,0.0],["2017-01",0.0,0.0],["2017-02",0.0,0.0],["2017-03",0.0,0.0],["2017-04",0.0,-0.001025],["2017-05",0.0,-0.011132],["2017-06",0.0,-0.024197],["2017-07",0.0,-0.024207],["2017-08",0.0,-0.012558],["2017-09",0.0,-0.010848],["2017-10",0.0,0.0],["2017-11",0.0,-0.008372],["2017-12",0.0,0.0],["2018-01",0.0,0.0],["2018-02",0.0,-0.010838],["2018-03",0.0,-0.021039],["2018-04",0.0,-0.007634],["2018-05",0.0,0.0],["2018-06",0.0,-0.019019],["2018-07",0.0,-0.014126],["2018-08",0.0,-0.020072],["2018-09",0.0,-0.020938],["2018-10",0.0,-0.0382],["2018-11",0.0,-0.023921],["2018-12",0.0,-0.042605],["2019-01",0.0,0.0],["2019-02",0.0,0.0],["2019-03",0.0,0.0],["2019-04",0.0,0.0],["2019-05",0.0,-0.021222],["2019-06",0.0,0.0],["2019-07",0.0,0.0],["2019-08",0.0,0.0],["2019-09",0.0,0.0],["2019-10",0.0,0.0],["2019-11",0.0,0.0],["2019-12",0.0,0.0],["2020-01",0.0,0.0],["2020-02",0.0,-0.031326],["2020-03",0.0,-0.093847],["2020-04",0.0,-0.039006],["2020-05",0.0,-0.033786],["2020-06",0.0,-0.006091],["2020-07",0.0,0.0],["2020-08",0.0,0.0],["2020-09",0.0,-0.00141],["2020-10",0.0,-0.002304],["2020-11",0.0,0.0],["2020-12",0.0,0.0],["2021-01",0.0,0.0],["2021-02",0.0,-0.010618],["2021-03",0.0,0.0],["2021-04",0.0,0.0],["2021-05",0.0,0.0],["2021-06",0.0,0.0],["2021-07",0.0,0.0],["2021-08",0.0,0.0],["2021-09",0.0,-0.012864],["2021-10",0.0,0.0],["2021-11",0.0,0.0],["2021-12",0.0,0.0],["2022-01",0.0,-0.013625],["2022-02",0.0,-0.017471],["2022-03",0.0,-0.005529],["2022-04",0.0,-0.014446],["2022-05",0.0,-0.044714],["2022-06",0.0,-0.073746],["2022-07",0.0,-0.034236],["2022-08",0.0,-0.050182],["2022-09",0.0,-0.093608],["2022-10",0.0,-0.09805],["2022-11",0.0,-0.065059],["2022-12",0.0,-0.097345],["2023-01",0.0,-0.058225],["2023-02",0.0,-0.079738],["2023-03",0.0,-0.058987],["2023-04",0.0,-0.066321],["2023-05",0.0,-0.051581],["2023-06",0.0,-0.048189],["2023-07",0.0,-0.027708],["2023-08",0.0,-0.038589],["2023-09",0.0,-0.054261],["2023-10",0.0,-0.053933],["2023-11",0.0,-0.021729],["2023-12",0.0,0.0],["2024-01",0.0,0.0],["2024-02",0.0,0.0],["2024-03",0.0,0.0],["2024-04",0.0,0.0],["2024-05",0.0,0.0],["2024-06",0.0,0.0],["2024-07",0.0,0.0],["2024-08",0.0,-0.000642],["2024-09",0.0,0.0],["2024-10",0.0,0.0],["2024-11",0.0,0.0],["2024-12",0.0,-0.008594],["2025-01",0.0,0.0],["2025-02",0.0,-0.003153],["2025-03",0.0,-0.019965],["2025-04",0.0,-0.031891],["2025-05",0.0,-0.006601],["2025-06",0.0,-0.005532],["2025-07",0.0,0.0],["2025-08",0.0,0.0],["2025-09",0.0,0.0],["2025-10",0.0,0.0],["2025-11",0.0,0.0],["2025-12",0.0,0.0],["2026-01",0.0,0.0],["2026-02",0.0,0.0],["2026-03",0.0,-0.066515],["2026-04",0.0,-0.020523],["2026-05",0.0,0.0],["2026-06",0.0,-0.016903],["2026-07",0.0,-0.041198],["2026-08",0.0,-0.006716],["2026-09",0.0,-0.012245],["2026-10",0.0,-0.031372]],"ventanas":[["2008-10",0.0,0.06467],["2008-11",0.0,0.013163],["2008-12",0.0,0.013834],["2009-01",0.0,0.052932],["2009-02",0.0,0.035632],["2009-03",0.0,0.035017],["2009-04",0.0,0.015066],["2009-05",0.0,0.034664],["2009-06",0.0,0.034692],["2009-07",0.0,0.020684],["2009-08",0.0,0.047605],["2009-09",0.0,0.070706],["2009-10",0.0,0.1182],["2009-11",0.0,0.14984],["2009-12",0.0,0.131371],["2010-01",0.0,0.089846],["2010-02",0.0,0.10323],["2010-03",0.0,0.059409],["2010-04",0.0,0.033787],["2010-05",0.0,0.038129],["2010-06",0.0,0.05834],["2010-07",0.0,0.055775],["2010-08",0.0,0.039934],["2010-09",0.0,0.032846],["2010-10",0.0,0.037285],["2010-11",0.0,0.015074],["2010-12",0.0,-0.018954],["2011-01",0.0,0.043355],["2011-02",0.0,0.041528],["2011-03",0.0,0.040892],["2011-04",0.0,0.054257],["2011-05",0.0,0.046705],["2011-06",0.0,0.07219],["2011-07",0.0,0.095868],["2011-08",0.0,0.07492],["2011-09",0.0,0.09033],["2011-10",0.0,0.065292],["2011-11",0.0,0.054514],["2011-12",0.0,0.053625],["2012-01",0.0,0.03912],["2012-02",0.0,0.041062],["2012-03",0.0,0.064217],["2012-04",0.0,0.048008],["2012-05",0.0,0.05433],["2012-06",0.0,0.036307],["2012-07",0.0,-0.000998],["2012-08",0.0,0.001424],["2012-09",0.0,0.010715],["2012-10",0.0,0.0008],["2012-11",0.0,-0.011175],["2012-12",0.0,-0.058478],["2013-01",0.0,-0.026447],["2013-02",0.0,-0.019854],["2013-03",0.0,-0.057645],["2013-04",0.0,-0.019588],["2013-05",0.0,-0.024905],["2013-06",0.0,0.018462],["2013-07",0.0,0.006873],["2013-08",0.0,0.016492],["2013-09",0.0,0.024622],["2013-10",0.0,0.013551],["2013-11",0.0,0.034966],["2013-12",0.0,0.083033],["2014-01",0.0,0.074216],["2014-02",0.0,0.078288],["2014-03",0.0,0.075755],["2014-04",0.0,0.070957],["2014-05",0.0,0.077651],["2014-06",0.0,0.05587],["2014-07",0.0,0.124412],["2014-08",0.0,0.113005],["2014-09",0.0,0.146491],["2014-10",0.0,0.134745],["2014-11",0.0,0.122024],["2014-12",0.0,0.07645],["2015-01",0.0,-0.01744],["2015-02",0.0,-0.080231],["2015-03",0.0,-0.110966],["2015-04",0.0,-0.050837],["2015-05",0.0,-0.048173],["2015-06",0.0,-0.047649],["2015-07",0.0,-0.044574],["2015-08",0.0,0.031017],["2015-09",0.0,0.054647],["2015-10",0.0,0.004527],["2015-11",0.0,0.001176],["2015-12",0.0,0.074186],["2016-01",0.0,0.118102],["2016-02",0.0,0.08104],["2016-03",0.0,0.076171],["2016-04",0.0,0.067303],["2016-05",0.0,0.05888],["2016-06",0.0,0.029906],["2016-07",0.0,0.007408],["2016-08",0.0,0.051787],["2016-09",0.0,0.047542],["2016-10",0.0,0.049604],["2016-11",0.0,0.044279],["2016-12",0.0,0.022081],["2017-01",0.0,0.016689],["2017-02",0.0,-0.010896],["2017-03",0.0,-0.010848],["2017-04",0.0,0.014993],["2017-05",0.0,0.016783],["2017-06",0.0,0.040759],["2017-07",0.0,0.051606],["2017-08",0.0,0.027937],["2017-09",0.0,0.015578],["2017-10",0.0,0.004303],["2017-11",0.0,0.025221],["2017-12",0.0,-0.004292],["2018-01",0.0,-0.009637],["2018-02",0.0,-0.004824],["2018-03",0.0,0.004657],["2018-04",0.0,-0.026387],["2018-05",0.0,-0.023921],["2018-06",0.0,-0.024044],["2018-07",0.0,0.02377],["2018-08",0.0,0.038827],["2018-09",0.0,0.057462],["2018-10",0.0,0.089465],["2018-11",0.0,0.050744],["2018-12",0.0,0.115031],["2019-01",0.0,0.082289],["2019-02",0.0,0.087259],["2019-03",0.0,0.076636],["2019-04",0.0,0.066025],["2019-05",0.0,0.097715],["2019-06",0.0,0.077842],["2019-07",0.0,0.060798],["2019-08",0.0,0.014159],["2019-09",0.0,-0.057987],["2019-10",0.0,-0.003093],["2019-11",0.0,-0.005509],["2019-12",0.0,0.00095],["2020-01",0.0,0.016731],["2020-02",0.0,0.063771],["2020-03",0.0,0.135563],["2020-04",0.0,0.069801],["2020-05",0.0,0.089642],["2020-06",0.0,0.083037],["2020-07",0.0,0.070244],["2020-08",0.0,0.044787],["2020-09",0.0,0.073172],["2020-10",0.0,0.077943],["2020-11",0.0,0.069615],["2020-12",0.0,0.057505],["2021-01",0.0,0.04986],["2021-02",0.0,0.071885],["2021-03",0.0,0.031564],["2021-04",0.0,0.044868],["2021-05",0.0,0.036078],["2021-06",0.0,0.03737],["2021-07",0.0,0.019595],["2021-08",0.0,0.005426],["2021-09",0.0,0.030908],["2021-10",0.0,0.005092],["2021-11",0.0,-0.033144],["2021-12",0.0,-0.073746],["2022-01",0.0,-0.020895],["2022-02",0.0,-0.033293],["2022-03",0.0,-0.088569],["2022-04",0.0,-0.08483],["2022-05",0.0,-0.021297],["2022-06",0.0,-0.025479],["2022-07",0.0,-0.024839],["2022-08",0.0,-0.031118],["2022-09",0.0,0.038197],["2022-10",0.0,0.035178],["2022-11",0.0,0.014416],["2022-12",0.0,0.054458],["2023-01",0.0,0.032404],["2023-02",0.0,0.044715],["2023-03",0.0,0.005023],["2023-04",0.0,0.013268],["2023-05",0.0,0.031475],["2023-06",0.0,0.053331],["2023-07",0.0,0.038456],["2023-08",0.0,0.066241],["2023-09",0.0,0.128173],["2023-10",0.0,0.134904],["2023-11",0.0,0.098316],["2023-12",0.0,0.103188],["2024-01",0.0,0.109728],["2024-02",0.0,0.092341],["2024-03",0.0,0.080806],["2024-04",0.0,0.088557],["2024-05",0.0,0.116421],["2024-06",0.0,0.075229],["2024-07",0.0,0.098542],["2024-08",0.0,0.095781],["2024-09",0.0,0.04608],["2024-10",0.0,0.019555],["2024-11",0.0,0.019359],["2024-12",0.0,0.029303],["2025-01",0.0,0.023232],["2025-02",0.0,0.029646],["2025-03",0.0,0.09967],["2025-04",0.0,0.158706],["2025-05",0.0,0.136621],["2025-06",0.0,0.145584],["2025-07",0.0,0.168911],["2025-08",0.0,0.206396],["2025-09",0.0,0.072531],["2025-10",0.0,0.081193],["2025-11",0.0,0.113628],["2025-12",0.0,0.085071],["2026-01",0.0,0.007982],["2026-02",0.0,0.008664],["2026-03",0.0,0.074521],["2026-04",0.0,0.004236]],"crisis":[{"inicio":"2015-02","fin":"2015-08","bot":0.0,"fija":-0.080231},{"inicio":"2015-03","fin":"2015-09","bot":0.0,"fija":-0.110966},{"inicio":"2021-12","fin":"2022-06","bot":0.0,"fija":-0.073746},{"inicio":"2022-03","fin":"2022-09","bot":0.0,"fija":-0.088569},{"inicio":"2022-04","fin":"2022-10","bot":0.0,"fija":-0.08483}],"extremos":{"bot":{"final":1000.0,"caida_maxima":0,"peor_mes":["2008-11",0.0],"peor_ano":["2008",0.0]},"fija":{"final":4167.88,"caida_maxima":-0.110966,"peor_mes":["2026-03",-0.066515],"peor_ano":["2022",-0.097345]},"mc_p95":0.0},"eleccion":{"fecha":"2026-10-31","opcion":"bot"}},"ejemplo_2008":[["2009-09",100.0,null,null],["2009-10",97.33,null,null],["2009-11",97.94,null,null],["2009-12",104.65,null,null]],"prueba_en_seco":{"bot":[["2025-10",992.0],["2025-11",997.61],["2025-12",1005.98],["2026-01",1053.04],["2026-02",1088.54],["2026-03",1011.51],["2026-04",1065.36],["2026-05",1108.24],["2026-06",1073.67],["2026-07",1024.93],["2026-08",1053.97],["2026-09",1069.53],["2026-10",1027.55]],"fija":[["2025-10",1000.0],["2025-11",1006.57],["2025-12",1015.59],["2026-01",1066.25],["2026-02",1103.85],["2026-03",1030.42],["2026-04",1081.19],["2026-05",1120.94],["2026-06",1101.99],["2026-07",1074.76],["2026-08",1113.41],["2026-09",1107.21],["2026-10",1085.77]],"escalada":[["2025-10",1000.0],["2025-11",1004.39],["2025-12",1010.41],["2026-01",1044.26],["2026-02",1069.37],["2026-03",1020.32],["2026-04",1054.23],["2026-05",1080.79],["2026-06",1068.13],["2026-07",1049.94],["2026-08",1075.76],["2026-09",1071.62],["2026-10",1057.29]],"operaciones":[{"fecha":"2025-10-31","activo":"RV_MUNDIAL","lado":"compra","acciones":2.0,"precio":111.835,"comision":2.0,"importe":225.67},{"fecha":"2025-10-31","activo":"RV_EMERGENTE","lado":"compra","acciones":6.0,"precio":38.84,"comision":2.0,"importe":235.04},{"fecha":"2025-10-31","activo":"BONOS_EUR","lado":"compra","acciones":1.0,"precio":223.77,"comision":2.0,"importe":225.77},{"fecha":"2025-10-31","activo":"ORO","lado":"compra","acciones":2.0,"precio":111.1,"comision":2.0,"importe":224.2},{"fecha":"2026-03-31","activo":"RV_MUNDIAL","lado":"venta","acciones":2.0,"precio":108.055,"comision":2.0,"importe":214.11},{"fecha":"2026-03-31","activo":"BONOS_EUR","lado":"venta","acciones":1.0,"precio":220.75,"comision":2.0,"importe":218.75},{"fecha":"2026-03-31","activo":"RV_EMERGENTE","lado":"compra","acciones":6.0,"precio":39.288,"comision":2.0,"importe":237.73},{"fecha":"2026-03-31","activo":"ORO","lado":"compra","acciones":1.0,"precio":128.8,"comision":2.0,"importe":130.8},{"fecha":"2026-06-30","activo":"ORO","lado":"venta","acciones":3.0,"precio":113.48,"comision":2.0,"importe":338.44},{"fecha":"2026-06-30","activo":"RV_MUNDIAL","lado":"compra","acciones":2.0,"precio":125.035,"comision":2.0,"importe":252.07},{"fecha":"2026-06-30","activo":"BONOS_EUR","lado":"compra","acciones":1.0,"precio":225.0,"comision":2.0,"importe":227.0},{"fecha":"2026-07-31","activo":"BONOS_EUR","lado":"venta","acciones":1.0,"precio":221.06,"comision":2.0,"importe":219.06},{"fecha":"2026-10-31","activo":"RV_EMERGENTE","lado":"venta","acciones":12.0,"precio":44.982,"comision":2.0,"importe":537.78},{"fecha":"2026-10-31","activo":"RV_MUNDIAL","lado":"compra","acciones":5.0,"precio":129.84,"comision":2.0,"importe":651.2}]},"diario":["| 2026-10-26 | 2026-10-31 | 1000.0 | 1000.00 | — | Emergentes -0.2%, Bonos -2.3% | 2026-10-31 |"]};
+const fmtE = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
+const fmtE0 = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+const fmtN = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 });
+const pct = (v, dec = 2) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v * 100).toLocaleString("es-ES", { minimumFractionDigits: dec, maximumFractionDigits: dec }) + " %";
+const pct0 = v => { const r = Math.round(v * 100); return (r < 0 ? "−" : "") + Math.abs(r) + " %"; };
+const aFecha = s => new Date(s.slice(0, 10) + "T12:00:00");
+const fecha = s => aFecha(s).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+const fechaCorta = s => aFecha(s).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+const mesAno = s => aFecha(s).toLocaleDateString("es-ES", { month: "short", year: "numeric" });
+const NOMBRES = { RV_MUNDIAL: "Bolsa mundial", RV_EMERGENTE: "Bolsa emergente", BONOS_EUR: "Bonos euro", ORO: "Oro" };
+const CRISIS = { 2008: "Crisis financiera", 2015: "China y emergentes", 2022: "Inflación y subida de tipos", 2013: "Caída del oro y susto de la Fed", 2019: "COVID" };
+const $ = id => document.getElementById(id);
+const el = (tag, attrs = {}, ...hijos) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === "class") e.className = v; else if (k === "style") e.style.cssText = v; else e.setAttribute(k, v); }
+  for (const h of hijos) if (h !== null && h !== undefined) e.append(h);
+  return e;
+};
+
+// ---------- Gráfico de líneas: un eje, leyenda y etiquetas al final, cruz con detalle al tocar y vista en tabla ----------
+const GRAFICOS = [];
+const redibujar = () => GRAFICOS.forEach(f => f());
+function grafico(contenedor, series, op = {}) {
+  const fmtY = op.fmtY || (v => fmtE0.format(v)), fmtV = op.fmtV || (v => fmtE.format(v)), fx = op.fx || fecha;
+  contenedor.replaceChildren();
+  const leg = el("div", { class: "legend" });
+  series.forEach(s => leg.append(el("span", {}, el("i", { style: `background:var(${s.color})` }), s.nombre)));
+  if (op.leyendaBanda) leg.append(el("span", {}, el("i", { style: "background:var(--bad-tint);height:10px;box-shadow:inset 0 0 0 1px var(--bad)" }), op.leyendaBanda));
+  const btn = el("button", { class: "linkbtn", type: "button" }, "Ver tabla");
+  const zona = el("div", { class: "chart" });
+  contenedor.append(el("div", { class: "cab-graf" }, leg, btn), zona);
+  const xs = series[0].puntos.map(p => p[0]);
+  const dibujar = () => {
+    const W = Math.round(zona.clientWidth); if (!W || W === zona._ancho) return; zona._ancho = W; zona.replaceChildren();
+    const estrecho = W < 560, H = estrecho ? 230 : 300;
+    const etiquetas = series.map(s => (s.corto || s.nombre) + (op.valorFinal ? " " + fmtY(s.puntos[s.puntos.length - 1][1]) : ""));
+    const m = { l: 52, r: Math.min(150, 14 + 7 * Math.max(...etiquetas.map(t => t.length))), t: 10, b: 26 };
+    const todos = series.flatMap(s => s.puntos.map(p => p[1]));
+    let lo = Math.min(...todos), hi = Math.max(...todos); const pad = (hi - lo) * 0.05 || 10; lo -= pad; hi += pad;
+    if (op.yMax !== undefined) hi = Math.min(hi, op.yMax);
+    const bruto = (hi - lo) / 4, pot = Math.pow(10, Math.floor(Math.log10(bruto))), rel = bruto / pot;
+    const paso = (rel <= 1 ? 1 : rel <= 2 ? 2 : rel <= 5 ? 5 : 10) * pot;
+    lo = Math.floor(lo / paso) * paso; hi = Math.ceil(hi / paso - 1e-9) * paso;
+    const marcasY = []; for (let v = lo; v <= hi + paso / 2; v += paso) marcasY.push(v);
+    const X = i => m.l + (i / Math.max(1, xs.length - 1)) * (W - m.l - m.r);
+    const Y = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", (op.titulo || "Evolución") + ": " + series.map(s => s.nombre).join(", "));
+    const add = (tag, a) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(a)) n.setAttribute(k, v); svg.append(n); return n; };
+    for (const v of marcasY) {
+      add("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: "var(--grid)", "stroke-width": 1 });
+      add("text", { x: m.l - 8, y: Y(v) + 4, "text-anchor": "end", "font-size": 12, fill: "var(--muted)" }).textContent = fmtY(v);
+    }
+    (op.bandas || []).forEach(([i0, i1]) => {  // tramos sombreados (por ejemplo, meses con el bot fuera)
+      const x0 = Math.max(m.l, X(i0 - 0.5)), x1 = Math.min(W - m.r, X(i1 + 0.5));
+      add("rect", { x: x0, y: m.t, width: Math.max(0, x1 - x0), height: H - m.t - m.b, fill: "var(--bad-tint)" });
+    });
+    const marcasX = (estrecho ? [0, xs.length - 1] : [0, Math.floor(xs.length / 2), xs.length - 1]).filter((v, i, a) => a.indexOf(v) === i);
+    marcasX.forEach(i => add("text", { x: X(i), y: H - 6, "text-anchor": i === 0 ? "start" : i === xs.length - 1 ? "end" : "middle",
+      "font-size": 12, fill: "var(--muted)" }).textContent = fx(xs[i]));
+    series.forEach(s => add("path", { d: s.puntos.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" "),
+      fill: "none", stroke: `var(${s.color})`, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    const finales = series.map((s, k) => ({ t: etiquetas[k], y: Y(s.puntos[s.puntos.length - 1][1]) })).sort((a, b) => a.y - b.y);
+    for (let i = 1; i < finales.length; i++) if (finales[i].y - finales[i - 1].y < 16) finales[i].y = finales[i - 1].y + 16;
+    finales.forEach(f => add("text", { x: W - m.r + 8, y: f.y + 4, "font-size": 12, fill: "var(--ink-2)" }).textContent = f.t);
+    const cruz = add("line", { y1: m.t, y2: H - m.b, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" });
+    const puntos = series.map(s => add("circle", { r: 4, fill: `var(${s.color})`, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }));
+    zona.append(svg);
+    const tip = el("div", { class: "tip" }); zona.append(tip);
+    const mover = ev => {
+      const r = svg.getBoundingClientRect(), cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+      const i = Math.max(0, Math.min(xs.length - 1, Math.round(((cx - r.left) * W / r.width - m.l) / (W - m.l - m.r) * (xs.length - 1))));
+      cruz.setAttribute("x1", X(i)); cruz.setAttribute("x2", X(i)); cruz.setAttribute("visibility", "visible");
+      tip.replaceChildren(el("b", {}, fx(xs[i])));
+      series.forEach((s, k) => { const v = s.puntos[i][1]; puntos[k].setAttribute("cx", X(i)); puntos[k].setAttribute("cy", Y(v));
+        puntos[k].setAttribute("visibility", "visible"); tip.append(el("span", {}, s.nombre, el("strong", {}, fmtV(v)))); });
+      tip.style.display = "block";
+      const izq = X(i) * r.width / W;
+      tip.style.left = Math.min(Math.max(0, izq > r.width / 2 ? izq - tip.offsetWidth - 12 : izq + 12), r.width - tip.offsetWidth) + "px"; tip.style.top = "4px";
+    };
+    const salir = () => { tip.style.display = "none"; cruz.setAttribute("visibility", "hidden"); puntos.forEach(p => p.setAttribute("visibility", "hidden")); };
+    svg.addEventListener("mousemove", mover); svg.addEventListener("mouseleave", salir);
+    svg.addEventListener("touchstart", mover, { passive: true }); svg.addEventListener("touchmove", mover, { passive: true });
+    svg.addEventListener("touchend", () => setTimeout(salir, 1800));
+  };
+  GRAFICOS.push(dibujar); dibujar();
+  const caja = el("div", { class: "tabla", hidden: "" }); const t = el("table"); caja.append(t); contenedor.append(caja);
+  btn.addEventListener("click", () => {
+    if (caja.hidden) {
+      const filas = xs.map((x, i) => el("tr", {}, el("td", {}, fx(x)), ...series.map(s => el("td", { class: "n" }, fmtV(s.puntos[i][1])))));
+      t.replaceChildren(el("thead", {}, el("tr", {}, el("th", {}, "Fecha"), ...series.map(s => el("th", { class: "n" }, s.nombre)))), el("tbody", {}, ...filas.reverse()));
+      caja.hidden = false; btn.textContent = "Ocultar tabla";
+    } else { caja.hidden = true; btn.textContent = "Ver tabla"; }
+  });
+}
+
+// ---------- Hoy ----------
+function barraDistancia(d) {
+  const ancho = Math.min(Math.abs(d) / 0.10, 1) * 50;
+  const llena = el("div", { class: "llena", style: `${d >= 0 ? "left:50%" : "right:50%"};width:${ancho}%;background:var(${d >= 0 ? "--good" : "--bad"})` });
+  return el("div", { class: "pista", "aria-hidden": "true" }, el("div", { class: "eje" }), llena);
+}
+function medidor(D, umbral) {
+  const min = -0.06, max = 0.06, pos = v => (Math.min(max, Math.max(min, v)) - min) / (max - min) * 100;
+  return el("div", { class: "gauge", role: "img", "aria-label": (D === null ? "" : `Diferencia ${pct(D)}; `) + `límite de la prueba ${pct(umbral)}` },
+    el("div", { class: "zona", style: `width:${pos(umbral)}%` }), el("div", { class: "cero", style: `left:${pos(0)}%` }),
+    el("div", { class: "rotulo", style: `left:${pos(umbral)}%` }, "límite " + pct(umbral)),
+    D === null ? null : el("div", { class: "marca", style: `left:${pos(D)}%` }));
+}
+function hoy(d) {
+  $("sub").textContent = `Dinero ficticio · datos al ${fecha(d.fecha_datos)}`;
+  const aviso = $("aviso");
+  if (d.avisos && d.avisos.length) aviso.append(el("div", { class: "aviso alarma" }, "⚠ Datos atrasados: " + d.avisos.join("; ") + ". La tarea diaria lo avisa por correo; al arreglarlo, el bot se pone al día solo."));
+  const r = d.rentabilidad;
+  $("valor").textContent = fmtE.format(d.valor);
+  $("valor-sub").replaceChildren(r ? el("span", { class: r.bot >= 0 ? "pos" : "neg" }, pct(r.bot) + " desde el " + fecha(d.inicio_medicion))
+    : `En efectivo hasta la primera decisión. La prueba mide del ${fecha(d.inicio_medicion)} al ${fecha(d.fin_prueba)}.`);
+  if (r) {
+    $("m-fija").textContent = pct(r.escalada);
+    $("m-d").replaceChildren(el("span", { class: r.D >= d.umbral ? "pos" : "neg" }, pct(r.D)));
+    $("gauge").replaceChildren(medidor(r.D, d.umbral));
+    $("gauge-txt").textContent = r.D >= d.umbral ? `Por encima del límite de la prueba (${pct(d.umbral)}): de momento aprobaría.` : `Por debajo del límite de la prueba (${pct(d.umbral)}): de momento suspendería.`;
+  } else {
+    $("gauge").replaceChildren(medidor(null, d.umbral));
+    $("gauge-txt").textContent = `Para aprobar, el bot no puede quedar más de ${pct(-d.umbral).replace("+", "")} por debajo de la cartera fija ajustada.`;
+  }
+  $("prox").textContent = fecha(d.proxima_decision);
+  const dias = Math.round((aFecha(d.proxima_decision) - aFecha(d.fecha_datos)) / 864e5);
+  $("prox-dias").textContent = dias > 1 ? `dentro de ${dias} días` : dias === 1 ? "mañana" : "hoy";
+
+  $("etfs").replaceChildren(...d.posiciones.map(p => {
+    const s = p.senal || {};
+    return el("div", { class: "etf" },
+      el("div", { class: "nom" }, NOMBRES[p.activo]), el("div", { class: "cod" }, p.etf.split(" ")[0] + " · " + fmtE.format(p.precio)),
+      el("div", { class: "dist num " + (s.media ? (s.dentro ? "pos" : "neg") : "") }, s.media ? pct(s.distancia, 1) : "—"),
+      s.media ? barraDistancia(s.distancia) : null,
+      s.media ? el("span", { class: "chip " + (s.dentro ? "in" : "out") }, s.dentro ? "▲ Dentro" : "▼ Fuera") : null,
+      el("div", { class: "peq", style: "margin-top:6px" }, p.acciones ? `${fmtN.format(p.acciones)} acc. · ${fmtE.format(p.valor)}` : "Sin acciones"));
+  }));
+
+  if (d.series) grafico($("graf-hoy"), [
+    { nombre: "Bot", color: "--series-1", puntos: d.series.bot },
+    { nombre: "Cartera fija", corto: "Fija", color: "--series-2", puntos: d.series.fija },
+    { nombre: "Fija ajustada", corto: "Ajustada", color: "--series-3", puntos: d.series.escalada }], { fx: fechaCorta });
+  else $("bloque-graf-hoy").hidden = true;
+
+  const proximas = (d.hitos || []).filter(h => h.fecha >= d.fecha_datos).slice(0, 4);
+  $("hitos").replaceChildren(...proximas.map(h => el("li", {}, el("b", {}, fecha(h.fecha)), el("span", { class: "sub" }, h.texto))));
+  $("bloque-hitos").hidden = !proximas.length;
+
+  const ops = (d.operaciones || []).slice().reverse();
+  $("ordenes").replaceChildren(...(ops.length ? ops.map(filaOrden) : [el("li", {}, el("span", { class: "sub" }, "Todavía no hay órdenes. La primera tanda será el " + fecha("2026-11-02") + "."))]));
+
+  const par = d.paridad || {};
+  $("proceso").replaceChildren(
+    el("li", {}, el("span", { class: "izq" }, "Meses procesados"), el("span", { class: "der" }, d.meses_procesados.length ? d.meses_procesados.join(", ") : "ninguno todavía")),
+    el("li", {}, el("span", { class: "izq" }, "Coincide con el backtest"), el("span", { class: "der" },
+      par.paridad_operaciones == null ? "se comprueba cada mes" : (par.paridad_operaciones && par.paridad_valor ? el("span", { class: "pos" }, "✓ Sí") : el("span", { class: "neg" }, "✗ NO, revisar")))),
+    el("li", {}, el("span", { class: "izq" }, "Fin de la prueba"), el("span", { class: "der" }, fecha(d.fin_prueba))),
+    el("li", {}, el("span", { class: "izq" }, "Decisión final"), el("span", { class: "der" }, d.decision_final)));
+}
+function filaOrden(o) {
+  return el("li", {}, el("span", { class: "izq" }, el("b", {}, `${o.lado === "compra" ? "Compra" : "Venta"} ${fmtN.format(o.acciones)} · ${NOMBRES[o.activo]}`),
+    el("div", { class: "peq" }, `${fecha(o.fecha)} · a ${fmtE.format(o.precio)} · comisión ${fmtE.format(o.comision)}`)),
+    el("span", { class: "der" }, fmtE.format(o.importe)));
+}
+
+// ---------- Desde cero ----------
+function barras10(vals) {
+  const media = vals.reduce((a, b) => a + b, 0) / vals.length, lo = Math.min(...vals, media) - 6, hi = Math.max(...vals, media) + 2;
+  const W = 320, H = 120, base = 96, Y = v => base - (v - lo) / (hi - lo) * (base - 10), ancho = W / vals.length;
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `Precios ${vals.join(", ")}; media ${fmtN.format(media)}`);
+  const add = (tag, a, txt) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(a)) n.setAttribute(k, v); if (txt) n.textContent = txt; svg.append(n); return n; };
+  vals.forEach((v, i) => {
+    const ultimo = i === vals.length - 1;
+    add("rect", { x: i * ancho + 3, y: Y(v), width: ancho - 6, height: base - Y(v), rx: 3, fill: ultimo ? "var(--series-1)" : "var(--axis)" });
+    add("text", { x: i * ancho + ancho / 2, y: base + 14, "text-anchor": "middle", "font-size": 11, fill: ultimo ? "var(--ink)" : "var(--muted)",
+      "font-weight": ultimo ? 700 : 400 }, ultimo ? "hoy" : String(v));
+  });
+  add("line", { x1: 0, x2: W, y1: Y(media), y2: Y(media), stroke: "var(--series-2)", "stroke-width": 2, "stroke-dasharray": "6 4" });
+  add("text", { x: 4, y: Y(media) - 5, "font-size": 12, "font-weight": 600, fill: "var(--ink)", stroke: "var(--surface)", "stroke-width": 4,
+    "paint-order": "stroke", "stroke-linejoin": "round" }, "media " + fmtN.format(media));
+  return svg;
+}
+function ejemplo(cont, titulo, vals) {
+  const media = vals.reduce((a, b) => a + b, 0) / vals.length, hoyV = vals[vals.length - 1], arriba = hoyV > media;
+  cont.replaceChildren(el("b", {}, titulo), el("div", { class: "peq" }, "Cierres de los 10 últimos meses: " + vals.join(" · ")), barras10(vals),
+    el("div", {}, `Suma ${vals.reduce((a, b) => a + b, 0)} ÷ 10 = media ${fmtN.format(media)}. Hoy cierra en ${hoyV}.`),
+    el("div", { class: "res " + (arriba ? "pos" : "neg") }, arriba ? "▲ Está por encima de la media: el bot la tiene (o la compra)." : "▼ Está por debajo de la media: el bot la vende y guarda el dinero."));
+}
+function desdeCero(d) {
+  const h = d.historia, e = d.ejemplo_2008 || [];
+  ejemplo($("ej-a"), "Ejemplo A: va hacia arriba", [100, 102, 101, 104, 106, 105, 108, 110, 109, 112]);
+  ejemplo($("ej-b"), "Ejemplo B: va hacia abajo", [110, 108, 107, 104, 102, 100, 98, 95, 96, 93]);
+  $("caida-fija").textContent = `Con las 4 cestas repartidas a partes iguales y sin tocarlas, 1.000 € llegaron a quedarse en unos ${fmtE0.format(1000 * (1 + h.extremos.fija.caida_maxima))}
+    (${pct(h.extremos.fija.caida_maxima, 0)}) en esa crisis. Mucha gente se asusta y vende justo en el peor momento.`;
+  if (e.length) {
+    const ipico = e.reduce((b, x, i) => x[1] > e[b][1] ? i : b, 0), imin = e.reduce((b, x, i) => x[1] < e[b][1] ? i : b, 0);
+    $("caida-2008").textContent = `En la crisis de 2008, la bolsa mundial llegó a perder un ${pct(e[imin][1] / e[ipico][1] - 1, 0).replace("−", "")} de su valor:
+      100 € de enero de 2007 se quedaron en ${fmtE0.format(e[imin][1])} en ${mesAno(e[imin][0])}.`;
+    const tramos = []; let ini = null;  // meses seguidos con el bot fuera
+    e.forEach((x, i) => { if (!x[3] && ini === null) ini = i; if ((x[3] || i === e.length - 1) && ini !== null) { tramos.push([ini, x[3] ? i - 1 : i]); ini = null; } });
+    grafico($("graf-2008"), [
+      { nombre: "Bolsa mundial", corto: "Precio", color: "--series-1", puntos: e.map(x => [x[0], x[1]]) },
+      { nombre: "Media de 10 meses", corto: "Media", color: "--series-2", puntos: e.map(x => [x[0], x[2]]) }],
+      { fx: mesAno, fmtY: v => Math.round(v) + " €", fmtV: v => fmtE.format(v), bandas: tramos, leyendaBanda: "Bot fuera", titulo: "Bolsa mundial y su media, 2007-2009" });
+    const largo = tramos.reduce((b, t) => t[1] - t[0] > b[1] - b[0] ? t : b, tramos[0] || [0, 0]), sal = e[largo[0]], ent = e[largo[1] + 1];
+    const cortos = tramos.filter(t => t !== largo && t[1] - t[0] < 2);
+    $("texto-2008").replaceChildren(
+      el("div", { class: "paso" }, el("span", { class: "n" }, "↓"), el("div", {}, `A finales de ${mesAno(sal[0])} la bolsa cayó por debajo de su media y el bot vendió. Los 100 € valían ${fmtE0.format(sal[1])}.`)),
+      el("div", { class: "paso" }, el("span", { class: "n" }, "!"), el("div", {}, `Lo peor llegó en ${mesAno(e[imin][0])}: ${fmtE0.format(e[imin][1])}. El bot tenía el dinero guardado y no lo sufrió.`)),
+      ent ? el("div", { class: "paso" }, el("span", { class: "n" }, "↑"), el("div", {}, `A finales de ${mesAno(ent[0])} la bolsa volvió a superar su media y el bot volvió a comprar, a ${fmtE0.format(ent[1])}.
+        Quien no hizo nada pasó de ${fmtE0.format(sal[1])} a ${fmtE0.format(ent[1])} (${pct(ent[1] / sal[1] - 1, 0)}) en ese tiempo.`)) : null,
+      cortos.length ? el("p", { class: "sub" }, `No siempre acierta: en ${cortos.map(t => mesAno(e[t[0]][0])).join(" y ")} salió y volvió a entrar al mes siguiente.
+        Fue una falsa alarma que costó dos comisiones. Es el precio de reaccionar.`) : null);
+  }
+  $("cero-hoy").replaceChildren(...d.posiciones.map(p => {
+    const s = p.senal || {};
+    return el("li", {}, el("span", { class: "izq" }, el("b", {}, NOMBRES[p.activo]),
+      el("div", { class: "peq" }, s.media ? `Está un ${pct(Math.abs(s.distancia), 1).replace("+", "")} ${s.dentro ? "por encima" : "por debajo"} de su media` : "Sin datos suficientes")),
+      el("span", { class: "der " + (s.dentro ? "pos" : "neg") }, s.media ? (s.dentro ? "▲ compraría" : "▼ guardado") : "—"));
+  }));
+  const ex = h.extremos, caja = (t, final, caida, color) => el("div", { class: "caja", style: `border-top:5px solid var(${color})` }, el("b", {}, t),
+    el("div", { style: "font-size:22px;font-weight:700" }, `1.000 € → ${fmtE0.format(final)}`), el("div", { class: "peq" }, `Peor caída: ${pct(caida, 0)}`));
+  $("cero-resultado").replaceChildren(caja("Con el bot", ex.bot.final, ex.bot.caida_maxima, "--series-1"),
+    caja("Sin hacer nada (cartera fija)", ex.fija.final, ex.fija.caida_maxima, "--series-2"));
+  const pierde = h.ventanas.filter(v => v[1] < 0).length;
+  $("cero-riesgos").replaceChildren(
+    el("li", {}, el("b", {}, "Puede perder dinero. "), `En la historia, perdió algo en ${pierde} de ${h.ventanas.length} periodos de 6 meses (más o menos 1 de cada ${Math.round(h.ventanas.length / pierde)}).`),
+    el("li", {}, el("b", {}, "Lo peor que ha pasado: "), `bajar un ${pct(ex.bot.caida_maxima, 0).replace("−", "")} desde su punto más alto. Lo peor que podría pasar, según una simulación: alrededor de un ${pct(ex.mc_p95, 0).replace("−", "")}.`),
+    el("li", {}, el("b", {}, "A veces se equivoca: "), "sale y vuelve a entrar cuando no hacía falta, y paga comisiones."),
+    el("li", {}, el("b", {}, "Llegar a 0 € es prácticamente imposible: "), "tendrían que valer nada a la vez miles de empresas, los gobiernos del euro y el oro."));
+}
+
+// ---------- Historia ----------
+function historia(h) {
+  grafico($("graf-curva"), [
+    { nombre: "Bot", color: "--series-1", puntos: h.curva.map(x => [x[0], x[1]]) },
+    { nombre: "Cartera fija", corto: "Fija", color: "--series-2", puntos: h.curva.map(x => [x[0], x[2]]) }],
+    { fx: mesAno, valorFinal: true, titulo: "Valor de 1.000 € desde 2005" });
+  grafico($("graf-caida"), [
+    { nombre: "Bot", color: "--series-1", puntos: h.caida.map(x => [x[0], x[1]]) },
+    { nombre: "Cartera fija", corto: "Fija", color: "--series-2", puntos: h.caida.map(x => [x[0], x[2]]) }],
+    { fx: mesAno, fmtY: pct0, fmtV: v => pct(v, 1), yMax: 0, titulo: "Caída desde el último máximo" });
+
+  const pintarCal = desde => {
+    const vs = h.ventanas.filter(v => v[0] >= desde);
+    const gana = vs.filter(v => v[1] > 0).length, ganaF = vs.filter(v => v[2] > 0).length, peor = Math.min(...vs.map(v => v[1]));
+    $("cifras").replaceChildren(
+      el("div", {}, el("div", { class: "v num" }, `${gana} de ${vs.length}`), el("div", { class: "sub" }, "veces ganó dinero el bot")),
+      el("div", {}, el("div", { class: "v num" }, `${ganaF} de ${vs.length}`), el("div", { class: "sub" }, "veces ganó la cartera fija")));
+    const porAno = {};
+    vs.forEach(v => { (porAno[v[0].slice(0, 4)] = porAno[v[0].slice(0, 4)] || {})[+v[0].slice(5, 7)] = v; });
+    const cal = $("cal"); cal.replaceChildren(el("span"), ..."EFMAMJJASOND".split("").map(m => el("span", { class: "mes" }, m)));
+    for (const ano of Object.keys(porAno).sort()) {
+      cal.append(el("span", { class: "ano" }, ano));
+      for (let mes = 1; mes <= 12; mes++) {
+        const v = porAno[ano][mes];
+        if (!v) { cal.append(el("span", { class: "celda vacia" })); continue; }
+        const b = el("button", { class: "celda " + (Math.abs(v[1]) < 0.0005 ? "igual" : v[1] > 0 ? "gana" : "pierde"), type: "button",
+          "aria-label": `${mesAno(v[0])}: bot ${pct(v[1], 1)}, cartera fija ${pct(v[2], 1)}` });
+        b.addEventListener("click", () => { cal.querySelectorAll(".activa").forEach(x => x.classList.remove("activa")); b.classList.add("activa"); detalle(v); });
+        cal.append(b);
+      }
+    }
+    $("ley-igual").hidden = !vs.some(v => Math.abs(v[1]) < 0.0005);
+    $("detalle").replaceChildren(el("span", { class: "sub" }, `Peor resultado del bot en este periodo: ${pct(peor, 1)}. Toca un cuadro para ver cada caso.`));
+  };
+  const detalle = v => $("detalle").replaceChildren(el("b", {}, `Empezando en ${mesAno(v[0])}, 6 meses:`), el("br"),
+    "Bot ", el("span", { class: v[1] >= 0 ? "pos" : "neg" }, pct(v[1], 1)), " · Cartera fija ", el("span", { class: v[2] >= 0 ? "pos" : "neg" }, pct(v[2], 1)),
+    el("br"), el("span", { class: "peq" }, `Con 1.000 €: el bot acaba en ${fmtE0.format(1000 * (1 + v[1]))} y la fija en ${fmtE0.format(1000 * (1 + v[2]))}.`));
+  document.querySelectorAll(".segm button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".segm button").forEach(x => x.setAttribute("aria-pressed", x === b)); pintarCal(b.dataset.desde);
+  }));
+  pintarCal("2023-10-01");
+
+  const peorF = Math.max(...h.crisis.map(c => Math.abs(Math.min(c.fija, c.bot, 0))));
+  const fila = (et, v, color) => el("div", { class: "barra-fila" }, el("span", {}, et),
+    el("div", { class: "pista2" }, el("div", { class: "barra", style: `width:${Math.abs(Math.min(v, 0)) / peorF * 100}%;background:var(${color})` })),
+    el("span", { class: "val " + (v >= 0 ? "pos" : "neg") }, pct(v, 1)));
+  $("crisis").replaceChildren(...h.crisis.map(c => el("div", { class: "crisis" },
+    el("div", { class: "tit" }, CRISIS[c.inicio.slice(0, 4)] || "Caída"), el("div", { class: "cuando" }, `${mesAno(c.inicio)} – ${mesAno(c.fin)}`),
+    fila("Fija", c.fija, "--series-2"), fila("Bot", c.bot, "--series-1"))));
+
+  const e = h.extremos;
+  const cuando = s => s.length === 10 ? fecha(s) : s.length === 7 ? mesAno(s + "-01") : s;
+  const celda = x => el("td", { class: "n" }, el("span", { class: "neg" }, pct(x[1], 1)), el("div", { class: "peq" }, cuando(x[0])));
+  $("extremos").replaceChildren(el("thead", {}, el("tr", {}, el("th", {}, "Con 1.000 €"), el("th", { class: "n" }, "Bot"), el("th", { class: "n" }, "Fija"))),
+    el("tbody", {},
+      el("tr", {}, el("td", {}, "Peor día"), celda(e.bot.peor_dia), celda(e.fija.peor_dia)),
+      el("tr", {}, el("td", {}, "Peor mes"), celda(e.bot.peor_mes), celda(e.fija.peor_mes)),
+      el("tr", {}, el("td", {}, "Peor año"), celda(e.bot.peor_ano), celda(e.fija.peor_ano)),
+      el("tr", {}, el("td", {}, "Peor caída desde un máximo"), el("td", { class: "n neg" }, pct(e.bot.caida_maxima, 1)), el("td", { class: "n neg" }, pct(e.fija.caida_maxima, 1)))));
+  $("mc").replaceChildren(el("b", {}, "Y lo que podría pasar: "), `el pasado ocurrió de una sola manera. Reordenando los mismos días de mercado de miles de formas,
+    en 1 de cada 20 historias el bot llega a caer un ${pct(e.mc_p95, 0).replace("−", "")}: con 1.000 €, quedarían unos ${fmtE0.format(1000 * (1 + e.mc_p95))}.
+    Llegar a 0 € es prácticamente imposible: no hay préstamos y serían 4 cosas muy distintas valiendo nada a la vez.`);
+}
+
+function seco(s) {
+  grafico($("graf-seco"), [
+    { nombre: "Bot", color: "--series-1", puntos: s.bot },
+    { nombre: "Cartera fija", corto: "Fija", color: "--series-2", puntos: s.fija },
+    { nombre: "Fija ajustada", corto: "Ajustada", color: "--series-3", puntos: s.escalada }], { fx: mesAno, valorFinal: false });
+  $("ordenes-seco").replaceChildren(...s.operaciones.slice().reverse().map(filaOrden));
+}
+
+// ---------- Bot o fija ----------
+function botOFija(d) {
+  const h = d.historia, e = h.extremos, c0 = h.crisis[0], v3 = h.ventanas.filter(v => v[0] >= "2023-10-01");
+  const opcion = (titulo, color, lema, filas) => el("div", { class: "opcion", style: `--c:var(${color})` },
+    el("h3", {}, titulo), el("div", { class: "sub" }, lema), el("dl", {}, ...filas.flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, v)])));
+  $("dos").replaceChildren(
+    opcion("Bot", "--series-1", "Cada mes compra lo que sube por encima de su media y vende lo que cae por debajo.", [
+      ["En la peor crisis (" + mesAno(c0.inicio) + ")", pct(c0.bot, 1)],
+      ["1.000 € de 2005, hoy", fmtE0.format(e.bot.final)],
+      ["Peor caída de su historia", pct(e.bot.caida_maxima, 1)],
+      ["Últimos 3 años, periodos de 6 meses con ganancia", `${v3.filter(v => v[1] > 0).length} de ${v3.length}`],
+      ["Trabajo", "Ninguno: automático, unas 6 órdenes al año"],
+      ["Impuestos", "Vende varias veces al año: paga antes"]]),
+    opcion("Cartera fija", "--series-2", "Siempre un 25 % en cada ETF; se reajusta una vez al año.", [
+      ["En la peor crisis (" + mesAno(c0.inicio) + ")", pct(c0.fija, 1)],
+      ["1.000 € de 2005, hoy", fmtE0.format(e.fija.final)],
+      ["Peor caída de su historia", pct(e.fija.caida_maxima, 1)],
+      ["Últimos 3 años, periodos de 6 meses con ganancia", `${v3.filter(v => v[2] > 0).length} de ${v3.length}`],
+      ["Trabajo", "Comprar una vez y reajustar cada enero"],
+      ["Impuestos", "Casi no vende: paga más tarde"]]));
+  const el_ = h.eleccion;
+  $("eleccion").replaceChildren(el("div", { class: "sub" }, `Elección anotada el ${fecha(el_.fecha)}, antes de ver ningún resultado`),
+    el("div", { class: "v" }, el_.opcion === "bot" ? "Bot" : "Cartera fija"),
+    el("p", {}, "Si al final el bot funciona bien pero queda parecido o algo por detrás de la cartera fija, se prefiere el bot por caer menos en las crisis, aunque a largo plazo gane menos."));
+  $("regla").replaceChildren(el("b", {}, "La regla de la prueba: "), `el bot no puede quedar más de ${pct(-d.umbral).replace("+", "")} por debajo de la fija ajustada
+    entre el ${fecha(d.inicio_medicion)} y el ${fecha(d.fin_prueba)}. Ejemplo: bot +1 % y ajustada +3 % → −2 puntos, aprueba; bot −1,5 % y ajustada +1,5 % → −3 puntos, no aprueba.`);
+}
+
+function diario(d) {
+  const lineas = (d.diario || []).slice().reverse().map(l => l.split("|").slice(1, -1).map(c => c.trim()));
+  $("lista-diario").replaceChildren(...(lineas.length ? lineas.map(c => el("li", {},
+    el("span", { class: "izq" }, el("b", {}, fecha(c[0])), el("div", { class: "peq" }, c[5] && c[5] !== "ninguno" ? "Cerca de cambiar: " + c[5] : "Ninguna señal cerca de cambiar")),
+    el("span", { class: "der" }, c[1], el("div", { class: "peq" }, c[4] && c[4] !== "—" ? "Dif. " + c[4] : "")))) : [el("li", {}, "Todavía no hay entradas")]));
+}
+
+// ---------- Pestañas, tema y arranque ----------
+function mostrar(p, desplazar = true) {
+  if (!$(p)) p = "hoy";
+  document.querySelectorAll("nav.tabs button").forEach(x => x.setAttribute("aria-selected", x.dataset.p === p));
+  document.querySelectorAll(".panel").forEach(x => x.hidden = x.id !== p);
+  if (desplazar) window.scrollTo(0, 0);
+  if (p === "cero") try { localStorage.setItem("visto-cero", "1"); } catch (e) {}
+  redibujar();
+}
+// La pestaña va en la dirección como "#/historia" (sin coincidir con ningún id, para que el navegador no salte a mitad de página).
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => { history.replaceState(null, "", "#/" + b.dataset.p); mostrar(b.dataset.p); }));
+addEventListener("resize", redibujar);
+const temas = ["auto", "claro", "oscuro"]; let tema = 0;
+try { tema = Math.max(0, temas.indexOf(localStorage.getItem("tema") || "auto")); } catch (e) {}
+const aplicarTema = () => { const v = temas[tema];
+  if (v === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", v === "claro" ? "light" : "dark");
+  $("tema").textContent = "Tema: " + v; };
+$("tema").addEventListener("click", () => { tema = (tema + 1) % 3; try { localStorage.setItem("tema", temas[tema]); } catch (e) {} aplicarTema(); });
+aplicarTema();
+
+if (DATOS) {
+  hoy(DATOS); desdeCero(DATOS); historia(DATOS.historia); seco(DATOS.prueba_en_seco); botOFija(DATOS); diario(DATOS);
+  // El aviso de "¿Primera vez?" desaparece cuando ya se ha visto la explicación.
+  let visto = false; try { visto = localStorage.getItem("visto-cero") === "1"; } catch (e) {}
+  $("bienvenida").hidden = visto;
+  const irACero = () => { history.replaceState(null, "", "#/cero"); mostrar("cero"); };
+  $("bienvenida").addEventListener("click", irACero);
+  $("bienvenida").addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); irACero(); } });
+  $("ir-estudios").addEventListener("click", ev => { ev.preventDefault(); history.replaceState(null, "", "#/como"); mostrar("como");
+    $("estudios").scrollIntoView({ behavior: "smooth" }); });
+  $("pie").textContent = `Actualizado automáticamente el ${new Date(DATOS.generado).toLocaleString("es-ES")} · Dinero ficticio · No es asesoramiento financiero.`;
+  mostrar(location.hash.replace(/^#\/?/, "") || "hoy", false);
+}
+</script>
+</body>
+</html>
