@@ -865,6 +865,9 @@ def main():
     print("Calculando SMA 10 meses...")
     sma = calcular_sma10(precios)
 
+    print("Ejecutando operaciones pendientes del trial...")  
+    ejecutar_trial(precios, sma)
+
     print("Ejecutando backtest histórico...")
     hist = backtest(precios, sma)
 
