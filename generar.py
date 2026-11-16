@@ -493,6 +493,95 @@ def prueba_seco(precios: pd.DataFrame, sma: pd.DataFrame) -> dict:
         "operaciones": operaciones,
     }
 
+# ---------------------------------------------------------------------------
+# Ejecución del trial en vivo
+# ---------------------------------------------------------------------------
+
+def ejecutar_trial(precios: pd.DataFrame, sma: pd.DataFrame) -> None:
+    """
+    Procesa los cierres de mes pendientes del trial en vivo:
+    aplica las señales de la SMA10, genera órdenes y actualiza estado.json.
+    La primera decisión se toma al cierre del mes anterior a INICIO_MEDICION
+    (octubre 2026) y la última al cierre del mes anterior a FIN_PRUEBA.
+    """
+    estado = cargar_estado()
+    activos = list(TICKERS.keys())
+    hoy = date.today()
+    procesados = set(estado.get("meses_procesados", []))
+
+    # Mes de la PRIMERA decisión (el de antes de INICIO_MEDICION)
+    primer_mes = INICIO_MEDICION.replace(day=1) - timedelta(days=1)
+    primer_mes = primer_mes.replace(day=1)
+    # Último mes posible: el anterior a FIN_PRUEBA
+    ultimo_mes = FIN_PRUEBA.replace(day=1) - timedelta(days=1)
+    ultimo_mes = ultimo_mes.replace(day=1)
+
+    cambios = False
+    m = primer_mes
+    while m <= ultimo_mes:
+        clave = f"{m.year}-{m.month:02d}"
+        ts = _ultimo_dia_bolsa_mes(m.year, m.month, precios)
+        # Solo procesar si ese cierre ya ha ocurrido y aún no está apuntado
+        if ts is not None and ts.date() <= hoy and clave not in procesados:
+            row = precios.loc[ts]
+            row_sma = sma.loc[ts] if ts in sma.index else pd.Series(dtype=float)
+
+            senales = {}
+            for a in activos:
+                if a in row and not pd.isna(row[a]) and a in row_sma.index and not pd.isna(row_sma[a]):
+                    senales[a] = bool(float(row[a]) > float(row_sma[a]))
+                else:
+                    senales[a] = None
+
+            # Ventas: lo que ya no está dentro
+            for a in activos:
+                acc = estado["posiciones"].get(a, 0.0)
+                if acc > 0 and senales[a] is not True and a in row and not pd.isna(row[a]):
+                    precio = float(row[a])
+                    importe = acc * precio - COMISION
+                    estado["operaciones"].append({
+                        "fecha": ts.strftime("%Y-%m-%d"),
+                        "activo": a, "lado": "venta",
+                        "acciones": acc, "precio": round(precio, 4),
+                        "comision": COMISION, "importe": round(importe, 2),
+                    })
+                    estado["caja"] += importe
+                    estado["posiciones"][a] = 0.0
+
+            # Compras: reparto a partes iguales entre lo que está dentro
+            dentro = [a for a in activos if senales[a] is True and a in row and not pd.isna(row[a])]
+            if dentro:
+                val_dentro = sum(estado["posiciones"].get(a, 0.0) * float(row[a]) for a in dentro)
+                asignacion = (estado["caja"] + val_dentro) / len(dentro)
+                for a in dentro:
+                    precio = float(row[a])
+                    val_actual = estado["posiciones"].get(a, 0.0) * precio
+                    diff = asignacion - val_actual
+                    if diff > precio:
+                        n = int(diff / precio)
+                        coste = n * precio + COMISION
+                        if n > 0 and coste <= estado["caja"]:
+                            estado["operaciones"].append({
+                                "fecha": ts.strftime("%Y-%m-%d"),
+                                "activo": a, "lado": "compra",
+                                "acciones": float(n), "precio": round(precio, 4),
+                                "comision": COMISION, "importe": round(coste, 2),
+                            })
+                            estado["posiciones"][a] = estado["posiciones"].get(a, 0.0) + n
+                            estado["caja"] -= coste
+
+            estado["meses_procesados"].append(clave)
+            procesados.add(clave)
+            cambios = True
+            print(f"  Trial: procesado {clave} ({ts.date()})")
+
+        # Siguiente mes
+        m = date(m.year + (1 if m.month == 12 else 0), 1 if m.month == 12 else m.month + 1, 1)
+
+    if cambios:
+        guardar_estado(estado)
+    else:
+        print("  Trial: no hay meses nuevos que procesar")
 
 # ---------------------------------------------------------------------------
 # Estado actual del trial
